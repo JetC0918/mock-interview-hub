@@ -9,7 +9,7 @@ import LoginPage from "./pages/LoginPage";
 import SignupPage from "./pages/SignupPage";
 import LobbyPage from "./pages/LobbyPage";
 import SessionPage from "./pages/SessionPage";
-import LeaderboardPage from "./pages/LeaderboardPage";
+
 import SpectatePage from "./pages/SpectatePage";
 import NotFound from "./pages/NotFound";
 
@@ -28,7 +28,7 @@ const App = () => (
             <Route path="/signup" element={<SignupPage />} />
             <Route path="/lobby" element={<LobbyPage />} />
             <Route path="/session/:sessionId" element={<SessionPage />} />
-            <Route path="/leaderboard" element={<LeaderboardPage />} />
+
             <Route path="/spectate" element={<SpectatePage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />

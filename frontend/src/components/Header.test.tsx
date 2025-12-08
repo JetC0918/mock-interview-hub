@@ -27,6 +27,5 @@ describe('Header Component', () => {
     render(<Header />);
     expect(screen.getByText('Sessions')).toBeInTheDocument();
     expect(screen.getByText('Spectate')).toBeInTheDocument();
-    expect(screen.getByText('Leaderboard')).toBeInTheDocument();
   });
 });

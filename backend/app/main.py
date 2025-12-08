@@ -1,7 +1,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-from .routers import auth, sessions, execution, leaderboard
+from .routers import auth, sessions, execution
 from .database.config import init_db, SessionLocal
 from .database.service import seed_database
 
@@ -48,7 +48,6 @@ app.add_middleware(
 app.include_router(auth.router)
 app.include_router(sessions.router)
 app.include_router(execution.router)
-app.include_router(leaderboard.router)
 
 @app.get("/")
 def read_root():

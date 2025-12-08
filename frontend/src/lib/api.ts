@@ -9,7 +9,7 @@ import { AuthService } from './api-client/services/AuthService';
 import { SessionsService } from './api-client/services/SessionsService';
 import { ChatService } from './api-client/services/ChatService';
 import { ExecutionService } from './api-client/services/ExecutionService';
-import { LeaderboardService } from './api-client/services/LeaderboardService';
+
 
 // Import generated types as 'Api*' to avoid conflicts
 import type { User as ApiUser } from './api-client/models/User';
@@ -19,7 +19,7 @@ import type { Problem as ApiProblem } from './api-client/models/Problem';
 import type { ChatMessage as ApiChatMessage } from './api-client/models/ChatMessage';
 import type { ExecutionResult as ApiExecutionResult } from './api-client/models/ExecutionResult';
 import type { TestResult as ApiTestResult } from './api-client/models/TestResult';
-import type { LeaderboardEntry as ApiLeaderboardEntry } from './api-client/models/LeaderboardEntry';
+
 import type { SupportedLanguage as ApiSupportedLanguage } from './api-client/models/SupportedLanguage';
 import type { CursorPosition as ApiCursorPosition } from './api-client/models/CursorPosition';
 
@@ -102,15 +102,7 @@ export interface TestResult {
   actual: string;
 }
 
-export interface LeaderboardEntry {
-  rank: number;
-  userId: string;
-  username: string;
-  avatar?: string;
-  sessionsCompleted: number;
-  avgScore: number;
-  totalTime: string;
-}
+
 
 export type SupportedLanguage = 'javascript' | 'typescript' | 'python' | 'java' | 'cpp' | 'go';
 
@@ -199,17 +191,7 @@ function mapExecutionResult(apiRes: ApiExecutionResult): ExecutionResult {
   };
 }
 
-function mapLeaderboardEntry(apiEntry: ApiLeaderboardEntry): LeaderboardEntry {
-  return {
-    rank: apiEntry.rank || 0,
-    userId: apiEntry.userId || '',
-    username: apiEntry.username || '',
-    avatar: apiEntry.avatar,
-    sessionsCompleted: apiEntry.sessionsCompleted || 0,
-    avgScore: apiEntry.avgScore || 0,
-    totalTime: apiEntry.totalTime || '',
-  };
-}
+
 
 
 // --- Template Helpers (Keep local for now as optimistics) ---
@@ -374,12 +356,7 @@ export const api = {
     },
   },
 
-  leaderboard: {
-    async get(): Promise<LeaderboardEntry[]> {
-      const entries = await LeaderboardService.getLeaderboard();
-      return entries.map(mapLeaderboardEntry);
-    },
-  },
+
 
   spectator: {
     async getSessions(): Promise<Session[]> {

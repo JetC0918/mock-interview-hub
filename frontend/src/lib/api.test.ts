@@ -4,7 +4,7 @@ import { AuthService } from './api-client/services/AuthService';
 import { SessionsService } from './api-client/services/SessionsService';
 import { ChatService } from './api-client/services/ChatService';
 import { ExecutionService } from './api-client/services/ExecutionService';
-import { LeaderboardService } from './api-client/services/LeaderboardService';
+
 
 // Mock the generated services with explicit libraries
 // We use the names found in the generated files
@@ -47,11 +47,7 @@ vi.mock('./api-client/services/ExecutionService', () => ({
   },
 }));
 
-vi.mock('./api-client/services/LeaderboardService', () => ({
-  LeaderboardService: {
-    getLeaderboard: vi.fn(),
-  },
-}));
+
 
 describe('API Module', () => {
   beforeEach(() => {
@@ -257,14 +253,5 @@ describe('API Module', () => {
     });
   });
 
-  describe('Leaderboard', () => {
-    it('should return leaderboard entries', async () => {
-      const mockEntries = [{ rank: 1, username: 'user', avgScore: 100 }];
-      vi.mocked(LeaderboardService.getLeaderboard).mockResolvedValue(mockEntries as any);
 
-      const leaderboard = await api.leaderboard.get();
-      expect(leaderboard.length).toBe(1);
-      expect(leaderboard[0].username).toBe('user');
-    });
-  });
 });

@@ -38,9 +38,6 @@ const Header: React.FC = () => {
           <Link to="/spectate" className="text-muted-foreground hover:text-foreground transition-colors">
             Spectate
           </Link>
-          <Link to="/leaderboard" className="text-muted-foreground hover:text-foreground transition-colors">
-            Leaderboard
-          </Link>
         </nav>
 
         <div className="flex items-center gap-3">
@@ -74,7 +71,7 @@ const Header: React.FC = () => {
               </Button>
             </div>
           )}
-          
+
           <DropdownMenu>
             <DropdownMenuTrigger asChild className="md:hidden">
               <Button variant="ghost" size="icon">
@@ -87,9 +84,6 @@ const Header: React.FC = () => {
               </DropdownMenuItem>
               <DropdownMenuItem onClick={() => navigate('/spectate')}>
                 Spectate
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => navigate('/leaderboard')}>
-                Leaderboard
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
