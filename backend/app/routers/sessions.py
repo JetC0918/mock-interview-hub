@@ -1,128 +1,137 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from typing import List
+from sqlalchemy.orm import Session as DBSession
 from ..models.session import Session, SessionCreate, SessionJoin, Participant
 from ..models.execution import ChatMessage, ChatMessageCreate
 from ..models.common import SupportedLanguage, CursorPosition
-from ..services.mock_db import db
+from ..database.config import get_db
+from ..database.service import DatabaseService
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
+
+def get_service(db: DBSession = Depends(get_db)) -> DatabaseService:
+    return DatabaseService(db)
+
+
 @router.get("/", response_model=List[Session])
-def get_sessions():
-    return list(db.sessions.values())
+def get_sessions(service: DatabaseService = Depends(get_service)):
+    return service.get_all_sessions()
+
 
 @router.post("/", response_model=Session, status_code=201)
-def create_session(session_in: SessionCreate):
-    # Mock getting current user (usually first host)
-    user = list(db.users.values())[0] if db.users else db.create_user("Host", "host@example.com")
+def create_session(session_in: SessionCreate, service: DatabaseService = Depends(get_service)):
+    # Get current user (use first user for mock)
+    user = service.get_first_user()
+    if not user:
+        user = service.create_user("Host", "host@example.com")
     
-    session = db.create_session(
+    session = service.create_session(
         title=session_in.title,
         host_id=user.id,
         language=session_in.language or SupportedLanguage.PYTHON
     )
     # Host joins automatically
-    db.join_session(session.id, user)
-    return session
+    service.join_session(session.id, user)
+    return service.get_session(session.id)
+
 
 @router.get("/{id}", response_model=Session)
-def get_session(id: str):
-    session = db.get_session(id)
+def get_session(id: str, service: DatabaseService = Depends(get_service)):
+    session = service.get_session(id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     return session
 
+
 @router.post("/{id}/join", response_model=Session)
-def join_session(id: str, body: SessionJoin):
-    session = db.get_session(id)
+def join_session(id: str, body: SessionJoin, service: DatabaseService = Depends(get_service)):
+    session = service.get_session(id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     if session.pin != body.pin:
         raise HTTPException(status_code=403, detail="Invalid PIN")
     
-    # Mock user
-    user = list(db.users.values())[-1] if db.users else db.create_user("Participant", None)
+    # Get last user for mock (simulating current user)
+    user = service.get_last_user()
+    if not user:
+        user = service.create_user("Participant", None)
     
-    updated_session = db.join_session(id, user)
+    updated_session = service.join_session(id, user)
     return updated_session
+
 
 @router.post("/join-by-pin", response_model=Session)
-def join_by_pin(body: SessionJoin):
+def join_by_pin(body: SessionJoin, service: DatabaseService = Depends(get_service)):
     # Find session by pin
-    found_session = None
-    for s in db.sessions.values():
-        if s.pin == body.pin:
-            found_session = s
-            break
-    
-    if not found_session:
+    session = service.get_session_by_pin(body.pin)
+    if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
     # Mock user
-    user = list(db.users.values())[-1] if db.users else db.create_user("Participant", None)
+    user = service.get_last_user()
+    if not user:
+        user = service.create_user("Participant", None)
     
-    updated_session = db.join_session(found_session.id, user)
+    updated_session = service.join_session(session.id, user)
     return updated_session
 
+
 @router.put("/{id}/code")
-def update_code(id: str, body: dict): # body: {code: str}
-    session = db.get_session(id)
-    if not session:
+def update_code(id: str, body: dict, service: DatabaseService = Depends(get_service)):
+    if not service.update_session_code(id, body.get("code", "")):
         raise HTTPException(status_code=404, detail="Session not found")
-    session.code = body.get("code", "")
     return {"message": "Code updated"}
 
+
 @router.put("/{id}/language")
-def update_language(id: str, body: dict): # body: {language: str}
-    session = db.get_session(id)
-    if not session:
+def update_language(id: str, body: dict, service: DatabaseService = Depends(get_service)):
+    if not service.update_session_language(id, body.get("language")):
         raise HTTPException(status_code=404, detail="Session not found")
-    session.language = body.get("language")
     return {"message": "Language updated"}
 
+
 @router.put("/{id}/cursor")
-def update_cursor(id: str, body: dict): # body: {userId: str, position: CursorPosition}
-    session = db.get_session(id)
-    if not session:
+def update_cursor(id: str, body: dict, service: DatabaseService = Depends(get_service)):
+    user_id = body.get("userId")
+    position = body.get("position", {})
+    if not service.update_cursor_position(id, user_id, position.get("line"), position.get("column")):
         raise HTTPException(status_code=404, detail="Session not found")
-    # Find participant
-    userId = body.get("userId")
-    for p in session.participants:
-        if p.id == userId:
-            p.cursorPosition = body.get("position")
-            break
     return {"message": "Cursor updated"}
 
+
 @router.post("/{id}/leave")
-def leave_session(id: str):
-    session = db.get_session(id)
+def leave_session(id: str, service: DatabaseService = Depends(get_service)):
+    session = service.get_session(id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    # In mock, we don't know WHO is leaving unless we have auth.
-    # We'll just say ok for now. 
+    # In mock, we don't know WHO is leaving unless we have auth
     return {"message": "Left session"}
 
+
 @router.post("/{id}/end")
-def end_session(id: str):
-    session = db.get_session(id)
-    if not session:
+def end_session(id: str, service: DatabaseService = Depends(get_service)):
+    if not service.update_session_status(id, "ended"):
         raise HTTPException(status_code=404, detail="Session not found")
-    session.status = "ended"
     return {"message": "Session ended"}
+
 
 # Chat Endpoints
 @router.get("/{id}/messages", response_model=List[ChatMessage])
-def get_messages(id: str):
-    return db.get_messages(id)
+def get_messages(id: str, service: DatabaseService = Depends(get_service)):
+    return service.get_messages(id)
+
 
 @router.post("/{id}/messages", response_model=ChatMessage, status_code=201)
-def send_message(id: str, body: ChatMessageCreate):
-    session = db.get_session(id)
+def send_message(id: str, body: ChatMessageCreate, service: DatabaseService = Depends(get_service)):
+    session = service.get_session(id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
     # Mock user
-    user = list(db.users.values())[0] if db.users else db.create_user("User", None)
+    user = service.get_first_user()
+    if not user:
+        user = service.create_user("User", None)
     
-    msg = db.add_message(id, user.id, user.username, body.message)
+    msg = service.add_message(id, user.id, user.username, body.message)
     return msg

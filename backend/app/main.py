@@ -1,11 +1,29 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from contextlib import asynccontextmanager
 from .routers import auth, sessions, execution, leaderboard
+from .database.config import init_db, SessionLocal
+from .database.service import seed_database
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    """Initialize database on startup."""
+    init_db()
+    # Seed with initial data
+    db = SessionLocal()
+    try:
+        seed_database(db)
+    finally:
+        db.close()
+    yield
+
 
 app = FastAPI(
     title="CodioLive API",
     description="Backend API for CodioLive (Mock Interview Hub)",
-    version="1.0.0"
+    version="1.0.0",
+    lifespan=lifespan
 )
 
 # CORS (Allow all for development)

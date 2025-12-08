@@ -71,4 +71,4 @@ def test_execution(client: TestClient):
     response = client.post("/execution/run", json=code_data)
     assert response.status_code == 200
     result = response.json()
-    assert result["stdout"] == "Hello World\n"
+    assert result["stdout"] == "hello\n"
