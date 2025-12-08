@@ -20,12 +20,12 @@ describe('Header Component', () => {
 
   it('should show login button when not authenticated', () => {
     render(<Header />);
-    expect(screen.getByRole('link', { name: /log in/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
   it('should show navigation links', () => {
     render(<Header />);
-    expect(screen.getByText('Lobby')).toBeInTheDocument();
+    expect(screen.getByText('Sessions')).toBeInTheDocument();
     expect(screen.getByText('Spectate')).toBeInTheDocument();
     expect(screen.getByText('Leaderboard')).toBeInTheDocument();
   });

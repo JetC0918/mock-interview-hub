@@ -30,15 +30,15 @@ describe('LoginPage', () => {
 
   it('should render login form', () => {
     render(<LoginPage />);
-    
-    expect(screen.getByPlaceholderText(/email/i)).toBeInTheDocument();
-    expect(screen.getByPlaceholderText(/password/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /log in/i })).toBeInTheDocument();
+
+    expect(screen.getByLabelText(/email/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/password/i)).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /sign in/i })).toBeInTheDocument();
   });
 
   it('should have link to signup page', () => {
     render(<LoginPage />);
-    
+
     expect(screen.getByText(/don't have an account/i)).toBeInTheDocument();
     expect(screen.getByRole('link', { name: /sign up/i })).toBeInTheDocument();
   });
@@ -46,13 +46,13 @@ describe('LoginPage', () => {
   it('should call login on form submit', async () => {
     const user = userEvent.setup();
     mockLogin.mockResolvedValue({});
-    
+
     render(<LoginPage />);
-    
-    await user.type(screen.getByPlaceholderText(/email/i), 'test@example.com');
-    await user.type(screen.getByPlaceholderText(/password/i), 'password123');
-    await user.click(screen.getByRole('button', { name: /log in/i }));
-    
+
+    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
     await waitFor(() => {
       expect(mockLogin).toHaveBeenCalledWith('test@example.com', 'password123');
     });
@@ -61,13 +61,13 @@ describe('LoginPage', () => {
   it('should navigate to lobby on successful login', async () => {
     const user = userEvent.setup();
     mockLogin.mockResolvedValue({});
-    
+
     render(<LoginPage />);
-    
-    await user.type(screen.getByPlaceholderText(/email/i), 'test@example.com');
-    await user.type(screen.getByPlaceholderText(/password/i), 'password123');
-    await user.click(screen.getByRole('button', { name: /log in/i }));
-    
+
+    await user.type(screen.getByLabelText(/email/i), 'test@example.com');
+    await user.type(screen.getByLabelText(/password/i), 'password123');
+    await user.click(screen.getByRole('button', { name: /sign in/i }));
+
     await waitFor(() => {
       expect(mockNavigate).toHaveBeenCalledWith('/lobby');
     });

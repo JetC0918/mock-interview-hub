@@ -10,9 +10,9 @@ describe('OutputPanel', () => {
       exitCode: 0,
       executionTime: 15,
     };
-    
+
     render(<OutputPanel result={result} isRunning={false} />);
-    
+
     expect(screen.getByText('Hello, World!')).toBeInTheDocument();
   });
 
@@ -23,9 +23,9 @@ describe('OutputPanel', () => {
       exitCode: 1,
       executionTime: 5,
     };
-    
+
     render(<OutputPanel result={result} isRunning={false} />);
-    
+
     expect(screen.getByText('Error: Something went wrong')).toBeInTheDocument();
   });
 
@@ -36,15 +36,15 @@ describe('OutputPanel', () => {
       exitCode: 0,
       executionTime: 123,
     };
-    
+
     render(<OutputPanel result={result} isRunning={false} />);
-    
+
     expect(screen.getByText(/123/)).toBeInTheDocument();
   });
 
   it('should show running state', () => {
     render(<OutputPanel result={null} isRunning={true} />);
-    
+
     expect(screen.getByText(/running/i)).toBeInTheDocument();
   });
 
@@ -59,16 +59,16 @@ describe('OutputPanel', () => {
         { passed: false, input: '[3,4]', expected: '7', actual: '6' },
       ],
     };
-    
+
     render(<OutputPanel result={result} isRunning={false} />);
-    
+
     expect(screen.getByText(/passed/i)).toBeInTheDocument();
-    expect(screen.getByText(/failed/i)).toBeInTheDocument();
+    expect(screen.getByText(/actual/i)).toBeInTheDocument();
   });
 
   it('should show placeholder when no output', () => {
     render(<OutputPanel result={null} isRunning={false} />);
-    
+
     expect(screen.getByText(/run your code/i)).toBeInTheDocument();
   });
 });

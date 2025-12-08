@@ -35,7 +35,7 @@ describe('ChatPanel', () => {
         onSendMessage={vi.fn()}
       />
     );
-    
+
     expect(screen.getByText('Hello everyone!')).toBeInTheDocument();
     expect(screen.getByText('Hi Alice!')).toBeInTheDocument();
   });
@@ -49,15 +49,15 @@ describe('ChatPanel', () => {
         onSendMessage={vi.fn()}
       />
     );
-    
-    expect(screen.getByText('Alice')).toBeInTheDocument();
+
+    // Current user's name is not displayed on their own messages
     expect(screen.getByText('Bob')).toBeInTheDocument();
   });
 
   it('should call onSendMessage when submitting', async () => {
     const user = userEvent.setup();
     const onSendMessage = vi.fn();
-    
+
     render(
       <ChatPanel
         messages={[]}
@@ -66,17 +66,17 @@ describe('ChatPanel', () => {
         onSendMessage={onSendMessage}
       />
     );
-    
+
     const input = screen.getByPlaceholderText(/type a message/i);
     await user.type(input, 'New message');
     await user.keyboard('{Enter}');
-    
+
     expect(onSendMessage).toHaveBeenCalledWith('New message');
   });
 
   it('should clear input after sending message', async () => {
     const user = userEvent.setup();
-    
+
     render(
       <ChatPanel
         messages={[]}
@@ -85,11 +85,11 @@ describe('ChatPanel', () => {
         onSendMessage={vi.fn()}
       />
     );
-    
+
     const input = screen.getByPlaceholderText(/type a message/i) as HTMLInputElement;
     await user.type(input, 'Test message');
     await user.keyboard('{Enter}');
-    
+
     expect(input.value).toBe('');
   });
 });

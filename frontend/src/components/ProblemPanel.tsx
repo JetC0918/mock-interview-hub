@@ -14,6 +14,14 @@ const difficultyColors: Record<string, string> = {
 };
 
 const ProblemPanel: React.FC<ProblemPanelProps> = ({ problem }) => {
+  if (!problem) {
+    return (
+      <div className="h-full bg-card rounded-lg border border-border flex items-center justify-center">
+        <p className="text-muted-foreground">Loading problem...</p>
+      </div>
+    );
+  }
+
   return (
     <div className="h-full bg-card rounded-lg border border-border flex flex-col">
       <div className="px-4 py-3 border-b border-border flex items-center justify-between">
