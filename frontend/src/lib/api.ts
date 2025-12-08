@@ -1,11 +1,35 @@
 /**
  * Centralized API module for CodioLive
- * All backend calls are mocked here for easy replacement with real API later
+ * Uses generated OpenAPI client to communicate with the backend
+ * Includes adapters to map API types to frontend internal types
  */
 
-import { v4 as uuidv4 } from 'uuid';
+import { OpenAPI } from './api-client/core/OpenAPI';
+import { AuthService } from './api-client/services/AuthService';
+import { SessionsService } from './api-client/services/SessionsService';
+import { ChatService } from './api-client/services/ChatService';
+import { ExecutionService } from './api-client/services/ExecutionService';
+import { LeaderboardService } from './api-client/services/LeaderboardService';
 
-// Types
+// Import generated types as 'Api*' to avoid conflicts
+import type { User as ApiUser } from './api-client/models/User';
+import type { Session as ApiSession } from './api-client/models/Session';
+import type { Participant as ApiParticipant } from './api-client/models/Participant';
+import type { Problem as ApiProblem } from './api-client/models/Problem';
+import type { ChatMessage as ApiChatMessage } from './api-client/models/ChatMessage';
+import type { ExecutionResult as ApiExecutionResult } from './api-client/models/ExecutionResult';
+import type { TestResult as ApiTestResult } from './api-client/models/TestResult';
+import type { LeaderboardEntry as ApiLeaderboardEntry } from './api-client/models/LeaderboardEntry';
+import type { SupportedLanguage as ApiSupportedLanguage } from './api-client/models/SupportedLanguage';
+import type { CursorPosition as ApiCursorPosition } from './api-client/models/CursorPosition';
+
+// Configure API Client
+// Note: Backend runs on port 8000 by default (FastAPI) while frontend is on 8080
+OpenAPI.BASE = 'http://localhost:8000';
+OpenAPI.WITH_CREDENTIALS = true;
+
+// --- Frontend Internal Types (matching original mock structure) ---
+
 export interface User {
   id: string;
   username: string;
@@ -89,465 +113,282 @@ export interface LeaderboardEntry {
 
 export type SupportedLanguage = 'javascript' | 'typescript' | 'python' | 'java' | 'cpp' | 'go';
 
-// Mock data storage
-let currentUser: User | null = null;
-const sessions: Map<string, Session> = new Map();
-const chatMessages: Map<string, ChatMessage[]> = new Map();
+// --- Type Mappers ---
 
-// Simulated network delay
-const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+function mapUser(apiUser: ApiUser): User {
+  return {
+    id: apiUser.id || '',
+    username: apiUser.username || '',
+    email: apiUser.email || '',
+    avatar: apiUser.avatar,
+    role: (apiUser.role as User['role']) || 'participant',
+    createdAt: apiUser.createdAt ? new Date(apiUser.createdAt) : new Date(),
+  };
+}
 
-// Mock cursor colors
-const cursorColors = [
-  'hsl(174 72% 50%)', // cyan
-  'hsl(265 70% 60%)', // purple
-  'hsl(38 92% 50%)',  // orange
-  'hsl(330 80% 60%)', // pink
-  'hsl(142 72% 45%)', // green
-];
+function mapParticipant(apiParticipant: ApiParticipant): Participant {
+  return {
+    id: apiParticipant.id || '',
+    username: apiParticipant.username || '',
+    avatar: apiParticipant.avatar,
+    role: (apiParticipant.role as Participant['role']) || 'participant',
+    cursorPosition: apiParticipant.cursorPosition ? {
+      line: apiParticipant.cursorPosition.line || 0,
+      column: apiParticipant.cursorPosition.column || 0
+    } : undefined,
+    isTyping: apiParticipant.isTyping,
+    color: apiParticipant.color || '#888', // Default color if missing
+    joinedAt: apiParticipant.joinedAt ? new Date(apiParticipant.joinedAt) : new Date(),
+  };
+}
 
-// Sample problems
-const sampleProblems: Problem[] = [
-  {
-    id: '1',
-    title: 'Two Sum',
-    description: 'Given an array of integers nums and an integer target, return indices of the two numbers such that they add up to target.\n\nYou may assume that each input would have exactly one solution, and you may not use the same element twice.',
-    examples: [
-      { input: 'nums = [2,7,11,15], target = 9', output: '[0,1]', explanation: 'Because nums[0] + nums[1] == 9, we return [0, 1].' },
-      { input: 'nums = [3,2,4], target = 6', output: '[1,2]' },
-    ],
-    constraints: ['2 <= nums.length <= 10^4', '-10^9 <= nums[i] <= 10^9', 'Only one valid answer exists.'],
-    difficulty: 'easy',
-  },
-  {
-    id: '2',
-    title: 'Reverse Linked List',
-    description: 'Given the head of a singly linked list, reverse the list, and return the reversed list.',
-    examples: [
-      { input: 'head = [1,2,3,4,5]', output: '[5,4,3,2,1]' },
-      { input: 'head = [1,2]', output: '[2,1]' },
-    ],
-    constraints: ['The number of nodes in the list is the range [0, 5000]', '-5000 <= Node.val <= 5000'],
-    difficulty: 'easy',
-  },
-  {
-    id: '3',
-    title: 'Valid Parentheses',
-    description: 'Given a string s containing just the characters \'(\', \')\', \'{\', \'}\', \'[\' and \']\', determine if the input string is valid.\n\nAn input string is valid if:\n1. Open brackets must be closed by the same type of brackets.\n2. Open brackets must be closed in the correct order.\n3. Every close bracket has a corresponding open bracket of the same type.',
-    examples: [
-      { input: 's = "()"', output: 'true' },
-      { input: 's = "()[]{}"', output: 'true' },
-      { input: 's = "(]"', output: 'false' },
-    ],
-    constraints: ['1 <= s.length <= 10^4', 's consists of parentheses only \'()[]{}\''],
-    difficulty: 'easy',
-  },
-];
+function mapProblem(apiProblem: ApiProblem): Problem {
+  return {
+    id: apiProblem.id || '',
+    title: apiProblem.title || '',
+    description: apiProblem.description || '',
+    examples: (apiProblem.examples || []).map(ex => ({
+      input: ex.input || '',
+      output: ex.output || '',
+      explanation: ex.explanation
+    })),
+    constraints: apiProblem.constraints || [],
+    difficulty: (apiProblem.difficulty as Problem['difficulty']) || 'easy',
+  };
+}
 
-// Default code templates
+function mapSession(apiSession: ApiSession): Session {
+  return {
+    id: apiSession.id || '',
+    pin: apiSession.pin || '',
+    hostId: apiSession.hostId || '',
+    title: apiSession.title || '',
+    description: apiSession.description || '',
+    language: (apiSession.language as SupportedLanguage) || 'javascript',
+    participants: (apiSession.participants || []).map(mapParticipant),
+    code: apiSession.code || '',
+    status: (apiSession.status as Session['status']) || 'waiting',
+    createdAt: apiSession.createdAt ? new Date(apiSession.createdAt) : new Date(),
+    problem: apiSession.problem ? mapProblem(apiSession.problem) : undefined,
+  };
+}
+
+function mapChatMessage(apiMsg: ApiChatMessage): ChatMessage {
+  return {
+    id: apiMsg.id || '',
+    participantId: apiMsg.participantId || '',
+    username: apiMsg.username || '',
+    message: apiMsg.message || '',
+    timestamp: apiMsg.timestamp ? new Date(apiMsg.timestamp) : new Date(),
+  };
+}
+
+function mapExecutionResult(apiRes: ApiExecutionResult): ExecutionResult {
+  return {
+    stdout: apiRes.stdout || '',
+    stderr: apiRes.stderr || '',
+    exitCode: apiRes.exitCode || 0,
+    executionTime: apiRes.executionTime || 0,
+    testResults: apiRes.testResults?.map(tr => ({
+      passed: tr.passed || false,
+      input: tr.input || '',
+      expected: tr.expected || '',
+      actual: tr.actual || ''
+    })),
+  };
+}
+
+function mapLeaderboardEntry(apiEntry: ApiLeaderboardEntry): LeaderboardEntry {
+  return {
+    rank: apiEntry.rank || 0,
+    userId: apiEntry.userId || '',
+    username: apiEntry.username || '',
+    avatar: apiEntry.avatar,
+    sessionsCompleted: apiEntry.sessionsCompleted || 0,
+    avgScore: apiEntry.avgScore || 0,
+    totalTime: apiEntry.totalTime || '',
+  };
+}
+
+
+// --- Template Helpers (Keep local for now as optimistics) ---
 const codeTemplates: Record<SupportedLanguage, string> = {
-  javascript: `// Welcome to CodioLive!
-// Write your solution below
-
-function solution(input) {
-  // Your code here
-  return input;
-}
-
-// Test your solution
-console.log(solution([2, 7, 11, 15]));
-`,
-  typescript: `// Welcome to CodioLive!
-// Write your solution below
-
-function solution(input: number[]): number[] {
-  // Your code here
-  return input;
-}
-
-// Test your solution
-console.log(solution([2, 7, 11, 15]));
-`,
-  python: `# Welcome to CodioLive!
-# Write your solution below
-
-def solution(input):
-    # Your code here
-    return input
-
-# Test your solution
-print(solution([2, 7, 11, 15]))
-`,
-  java: `// Welcome to CodioLive!
-// Write your solution below
-
-public class Solution {
-    public static void main(String[] args) {
-        int[] result = solution(new int[]{2, 7, 11, 15});
-        System.out.println(java.util.Arrays.toString(result));
-    }
-    
-    public static int[] solution(int[] input) {
-        // Your code here
-        return input;
-    }
-}
-`,
-  cpp: `// Welcome to CodioLive!
-// Write your solution below
-#include <iostream>
-#include <vector>
-
-std::vector<int> solution(std::vector<int> input) {
-    // Your code here
-    return input;
-}
-
-int main() {
-    std::vector<int> result = solution({2, 7, 11, 15});
-    for (int n : result) std::cout << n << " ";
-    return 0;
-}
-`,
-  go: `// Welcome to CodioLive!
-// Write your solution below
-package main
-
-import "fmt"
-
-func solution(input []int) []int {
-    // Your code here
-    return input
-}
-
-func main() {
-    result := solution([]int{2, 7, 11, 15})
-    fmt.Println(result)
-}
-`,
+  javascript: `// Welcome to CodioLive!\n// Write your solution below\n\nfunction solution(input) {\n  // Your code here\n  return input;\n}\n\n// Test your solution\nconsole.log(solution([2, 7, 11, 15]));\n`,
+  typescript: `// Welcome to CodioLive!\n// Write your solution below\n\nfunction solution(input: number[]): number[] {\n  // Your code here\n  return input;\n}\n\n// Test your solution\nconsole.log(solution([2, 7, 11, 15]));\n`,
+  python: `# Welcome to CodioLive!\n# Write your solution below\n\ndef solution(input):\n    # Your code here\n    return input\n\n# Test your solution\nprint(solution([2, 7, 11, 15]))\n`,
+  java: `// Welcome to CodioLive!\n// Write your solution below\n\npublic class Solution {\n    public static void main(String[] args) {\n        int[] result = solution(new int[]{2, 7, 11, 15});\n        System.out.println(java.util.Arrays.toString(result));\n    }\n    \n    public static int[] solution(int[] input) {\n        // Your code here\n        return input;\n    }\n}\n`,
+  cpp: `// Welcome to CodioLive!\n// Write your solution below\n#include <iostream>\n#include <vector>\n\nstd::vector<int> solution(std::vector<int> input) {\n    // Your code here\n    return input;\n}\n\nint main() {\n    std::vector<int> result = solution({2, 7, 11, 15});\n    for (int n : result) std::cout << n << " ";\n    return 0;\n}\n`,
+  go: `// Welcome to CodioLive!\n// Write your solution below\npackage main\n\nimport "fmt"\n\nfunc solution(input []int) []int {\n    // Your code here\n    return input\n}\n\nfunc main() {\n    result := solution([]int{2, 7, 11, 15})\n    fmt.Println(result)\n}\n`,
 };
 
-// Generate random PIN
-const generatePin = (): string => {
-  return Math.floor(100000 + Math.random() * 900000).toString();
-};
-
-// API Functions
+// --- API Implementation ---
 
 export const api = {
-  // Auth
   auth: {
     async login(email: string, password: string): Promise<User> {
-      await delay(800);
-      if (!email || !password) throw new Error('Invalid credentials');
-      
-      currentUser = {
-        id: uuidv4(),
-        username: email.split('@')[0],
-        email,
-        role: 'host',
-        createdAt: new Date(),
-      };
-      return currentUser;
+      const user = await AuthService.loginUser({ email, password });
+      return mapUser(user);
     },
 
     async signup(username: string, email: string, password: string): Promise<User> {
-      await delay(800);
-      if (!username || !email || !password) throw new Error('All fields required');
-      
-      currentUser = {
-        id: uuidv4(),
-        username,
-        email,
-        role: 'host',
-        createdAt: new Date(),
-      };
-      return currentUser;
+      const user = await AuthService.registerNewUser({ username, email, password });
+      return mapUser(user);
     },
 
     async logout(): Promise<void> {
-      await delay(300);
-      currentUser = null;
+      return AuthService.logoutUser();
     },
 
     async getCurrentUser(): Promise<User | null> {
-      await delay(200);
-      return currentUser;
+      try {
+        const user = await AuthService.getCurrentAuthenticatedUser();
+        return mapUser(user);
+      } catch (error) {
+        return null;
+      }
     },
 
     async guestJoin(username: string): Promise<User> {
-      await delay(300);
-      currentUser = {
-        id: uuidv4(),
-        username,
-        email: '',
-        role: 'participant',
-        createdAt: new Date(),
-      };
-      return currentUser;
+      const user = await AuthService.joinAsGuest({ username });
+      return mapUser(user);
     },
   },
 
-  // Sessions
   sessions: {
     async create(title: string, language: SupportedLanguage = 'javascript'): Promise<Session> {
-      await delay(500);
-      if (!currentUser) throw new Error('Must be logged in to create session');
-
-      const session: Session = {
-        id: uuidv4(),
-        pin: generatePin(),
-        hostId: currentUser.id,
+      const session = await SessionsService.createANewSession({
         title,
-        description: '',
-        language,
-        participants: [{
-          id: currentUser.id,
-          username: currentUser.username,
-          role: 'host',
-          color: cursorColors[0],
-          joinedAt: new Date(),
-        }],
-        code: codeTemplates[language],
-        status: 'waiting',
-        createdAt: new Date(),
-        problem: sampleProblems[Math.floor(Math.random() * sampleProblems.length)],
-      };
-
-      sessions.set(session.id, session);
-      chatMessages.set(session.id, []);
-      return session;
+        language: language as ApiSupportedLanguage
+      });
+      return mapSession(session);
     },
 
     async join(sessionId: string, pin: string): Promise<Session> {
-      await delay(500);
-      const session = sessions.get(sessionId);
-      if (!session) throw new Error('Session not found');
-      if (session.pin !== pin) throw new Error('Invalid PIN');
-      if (!currentUser) throw new Error('Must be logged in');
-
-      const existingParticipant = session.participants.find(p => p.id === currentUser!.id);
-      if (!existingParticipant) {
-        session.participants.push({
-          id: currentUser.id,
-          username: currentUser.username,
-          role: currentUser.role,
-          color: cursorColors[session.participants.length % cursorColors.length],
-          joinedAt: new Date(),
-        });
-      }
-
-      return session;
+      const session = await SessionsService.joinASessionUsingIdAndPin(sessionId, { pin });
+      return mapSession(session);
     },
 
     async joinByPin(pin: string): Promise<Session> {
-      await delay(500);
-      const session = Array.from(sessions.values()).find(s => s.pin === pin);
-      if (!session) throw new Error('Session not found');
-      if (!currentUser) throw new Error('Must be logged in');
-
-      const existingParticipant = session.participants.find(p => p.id === currentUser!.id);
-      if (!existingParticipant) {
-        session.participants.push({
-          id: currentUser.id,
-          username: currentUser.username,
-          role: currentUser.role,
-          color: cursorColors[session.participants.length % cursorColors.length],
-          joinedAt: new Date(),
-        });
-      }
-
-      return session;
+      const session = await SessionsService.joinASessionUsingOnlyPin({ pin });
+      return mapSession(session);
     },
 
     async get(sessionId: string): Promise<Session | null> {
-      await delay(200);
-      return sessions.get(sessionId) || null;
+      try {
+        const session = await SessionsService.getSessionById(sessionId);
+        return mapSession(session);
+      } catch (error) {
+        return null;
+      }
     },
 
     async updateCode(sessionId: string, code: string): Promise<void> {
-      await delay(50);
-      const session = sessions.get(sessionId);
-      if (session) {
-        session.code = code;
-      }
+      await SessionsService.updateSessionCode(sessionId, { code });
     },
 
     async updateLanguage(sessionId: string, language: SupportedLanguage): Promise<void> {
-      await delay(100);
-      const session = sessions.get(sessionId);
-      if (session) {
-        session.language = language;
-        session.code = codeTemplates[language];
-      }
+      await SessionsService.updateSessionLanguage(sessionId, { language: language as ApiSupportedLanguage });
     },
 
     async updateCursor(sessionId: string, userId: string, position: CursorPosition): Promise<void> {
-      const session = sessions.get(sessionId);
-      if (session) {
-        const participant = session.participants.find(p => p.id === userId);
-        if (participant) {
-          participant.cursorPosition = position;
-        }
-      }
+      await SessionsService.updateUserCursorPosition(sessionId, {
+        userId,
+        position: position as ApiCursorPosition
+      });
     },
 
     async leave(sessionId: string): Promise<void> {
-      await delay(200);
-      const session = sessions.get(sessionId);
-      if (session && currentUser) {
-        session.participants = session.participants.filter(p => p.id !== currentUser!.id);
-      }
+      await SessionsService.leaveASession(sessionId);
     },
 
     async end(sessionId: string): Promise<void> {
-      await delay(300);
-      const session = sessions.get(sessionId);
-      if (session) {
-        session.status = 'ended';
-      }
+      await SessionsService.endASessionHostOnly(sessionId);
     },
 
     async getActive(): Promise<Session[]> {
-      await delay(300);
-      return Array.from(sessions.values()).filter(s => s.status !== 'ended');
+      const sessions = await SessionsService.getActiveSessions();
+      return sessions.map(mapSession);
     },
   },
 
-  // Chat
   chat: {
     async send(sessionId: string, message: string): Promise<ChatMessage> {
-      await delay(100);
-      if (!currentUser) throw new Error('Must be logged in');
-
-      const chatMessage: ChatMessage = {
-        id: uuidv4(),
-        participantId: currentUser.id,
-        username: currentUser.username,
-        message,
-        timestamp: new Date(),
-      };
-
-      const messages = chatMessages.get(sessionId) || [];
-      messages.push(chatMessage);
-      chatMessages.set(sessionId, messages);
-
-      return chatMessage;
+      const msg = await ChatService.sendAChatMessage(sessionId, { message });
+      return mapChatMessage(msg);
     },
 
     async getMessages(sessionId: string): Promise<ChatMessage[]> {
-      await delay(100);
-      return chatMessages.get(sessionId) || [];
+      const msgs = await ChatService.getChatMessages(sessionId);
+      return msgs.map(mapChatMessage);
     },
   },
 
-  // Code Execution (sandboxed - simulated)
   execution: {
     async run(code: string, language: SupportedLanguage): Promise<ExecutionResult> {
-      await delay(1000);
-
-      // Only JavaScript and Python have real execution in browser
-      if (language === 'javascript' || language === 'typescript') {
-        try {
-          const logs: string[] = [];
-          const originalLog = console.log;
-          console.log = (...args) => {
-            logs.push(args.map(a => typeof a === 'object' ? JSON.stringify(a) : String(a)).join(' '));
-          };
-
-          // Create sandboxed execution
-          const sandboxedCode = `
-            (function() {
-              ${code}
-            })();
-          `;
-          
-          const startTime = performance.now();
-          eval(sandboxedCode);
-          const executionTime = performance.now() - startTime;
-
-          console.log = originalLog;
-
-          return {
-            stdout: logs.join('\n'),
-            stderr: '',
-            exitCode: 0,
-            executionTime,
-          };
-        } catch (error: any) {
-          return {
-            stdout: '',
-            stderr: error.message,
-            exitCode: 1,
-            executionTime: 0,
-          };
-        }
-      }
-
-      // Mock execution for other languages
-      return {
-        stdout: `[Mock] Executed ${language} code successfully.\nOutput: [2, 7, 11, 15]`,
-        stderr: '',
-        exitCode: 0,
-        executionTime: 234,
-      };
+      const res = await ExecutionService.runCode({
+        code,
+        language: language as ApiSupportedLanguage
+      });
+      return mapExecutionResult(res);
     },
 
     async runTests(code: string, language: SupportedLanguage, problem: Problem): Promise<ExecutionResult> {
-      await delay(1500);
+      // Note: Helper might need recursive mapping if problem is complex, but for now we trust partial compatibility
+      // Actually 'problem' in runTests likely needs ID or full object. 
+      // The API expects 'Problem' object.
+      // We should map strictly if possible.
+      // For this tool call, we pass it as any or map it back.
+      // Since the generated client expects ApiProblem, and our Problem is slightly different (dates?),
+      // In this case actually Problem only has strings/arrays, so it might be compatible.
+      // But 'difficulty' enum might need casting.
 
-      // Mock test results
-      const testResults: TestResult[] = problem.examples.map((example, i) => ({
-        passed: i < 2,
-        input: example.input,
-        expected: example.output,
-        actual: i < 2 ? example.output : '[0, 0]',
-      }));
-
-      return {
-        stdout: `Running ${testResults.length} test cases...`,
-        stderr: '',
-        exitCode: testResults.some(t => !t.passed) ? 1 : 0,
-        executionTime: 456,
-        testResults,
+      const apiProblem: ApiProblem = {
+        ...problem,
+        difficulty: problem.difficulty as ApiProblem.difficulty // cast enum
       };
+
+      const res = await ExecutionService.runTests({
+        code,
+        language: language as ApiSupportedLanguage,
+        problem: apiProblem
+      });
+      return mapExecutionResult(res);
     },
   },
 
-  // Leaderboard
   leaderboard: {
     async get(): Promise<LeaderboardEntry[]> {
-      await delay(400);
-      return [
-        { rank: 1, userId: '1', username: 'alex_dev', sessionsCompleted: 47, avgScore: 98, totalTime: '12h 34m' },
-        { rank: 2, userId: '2', username: 'sarah_codes', sessionsCompleted: 42, avgScore: 95, totalTime: '14h 22m' },
-        { rank: 3, userId: '3', username: 'mike_python', sessionsCompleted: 38, avgScore: 92, totalTime: '11h 45m' },
-        { rank: 4, userId: '4', username: 'emma_js', sessionsCompleted: 35, avgScore: 89, totalTime: '15h 10m' },
-        { rank: 5, userId: '5', username: 'david_rust', sessionsCompleted: 31, avgScore: 87, totalTime: '10h 55m' },
-        { rank: 6, userId: '6', username: 'lisa_go', sessionsCompleted: 28, avgScore: 85, totalTime: '9h 30m' },
-        { rank: 7, userId: '7', username: 'tom_java', sessionsCompleted: 25, avgScore: 82, totalTime: '13h 15m' },
-        { rank: 8, userId: '8', username: 'anna_cpp', sessionsCompleted: 22, avgScore: 80, totalTime: '8h 45m' },
-      ];
+      const entries = await LeaderboardService.getLeaderboard();
+      return entries.map(mapLeaderboardEntry);
     },
   },
 
-  // Spectator
+  // Spectator (Not in API spec explicitly or mapped to sessions?)
+  // Looking at spec, spectator logic might be just joining with role?
+  // Or handled via active sessions list.
+  // The mock had `spectator.getSessions` and `watch`.
+  // `getSessions` -> `sessions.getActive` (already implemented)
+  // `watch` -> `sessions.get`?
   spectator: {
     async getSessions(): Promise<Session[]> {
-      await delay(400);
-      return Array.from(sessions.values()).filter(s => s.status === 'active');
+      const sessions = await SessionsService.getActiveSessions();
+      return sessions.map(mapSession);
     },
 
     async watch(sessionId: string): Promise<Session | null> {
-      await delay(200);
-      return sessions.get(sessionId) || null;
+      try {
+        const session = await SessionsService.getSessionById(sessionId);
+        return mapSession(session);
+      } catch (error) {
+        return null; // Return null if not found
+      }
     },
   },
 
-  // Utilities
+  // Utilities - these were mostly frontend helpers, keep them if useful or adapt
   utils: {
     getCodeTemplate(language: SupportedLanguage): string {
-      return codeTemplates[language];
+      return codeTemplates[language] || '';
     },
 
     getSupportedLanguages(): { value: SupportedLanguage; label: string }[] {
