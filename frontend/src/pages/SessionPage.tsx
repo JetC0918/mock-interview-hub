@@ -40,7 +40,7 @@ const SessionPage: React.FC = () => {
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [copied, setCopied] = useState(false);
-  
+
   // Guest join state
   const [guestName, setGuestName] = useState('');
   const [joinPin, setJoinPin] = useState('');
@@ -62,7 +62,7 @@ const SessionPage: React.FC = () => {
     const interval = setInterval(() => {
       setMockParticipants((prev) => {
         if (prev.length === 0) return prev;
-        
+
         const randomIndex = Math.floor(Math.random() * prev.length);
         const updated = [...prev];
         updated[randomIndex] = {
@@ -100,7 +100,7 @@ const SessionPage: React.FC = () => {
           joinedAt: new Date(),
         },
       ];
-      
+
       setTimeout(() => {
         setMockParticipants(mockUsers);
         toast({
@@ -124,7 +124,7 @@ const SessionPage: React.FC = () => {
         return;
       }
       setSession(sessionData);
-      
+
       const messages = await api.chat.getMessages(sessionId!);
       setChatMessages(messages);
     } catch (error: any) {
@@ -151,12 +151,12 @@ const SessionPage: React.FC = () => {
     setIsJoining(true);
     try {
       await guestJoin(guestName);
-      
+
       if (joinPin) {
         const sessionData = await api.sessions.joinByPin(joinPin);
         setSession(sessionData);
       }
-      
+
       await loadSession();
     } catch (error: any) {
       toast({
@@ -208,7 +208,7 @@ const SessionPage: React.FC = () => {
     setExecutionResult(null);
 
     try {
-      const result = await api.execution.runTests(session.code, session.language, session.problem);
+      const result = await api.execution.test(session.code, session.language, session.problem);
       setExecutionResult(result);
     } catch (error: any) {
       toast({
@@ -244,7 +244,7 @@ const SessionPage: React.FC = () => {
   };
 
   const languages = api.utils.getSupportedLanguages();
-  const allParticipants = session 
+  const allParticipants = session
     ? [...session.participants, ...mockParticipants]
     : [];
 

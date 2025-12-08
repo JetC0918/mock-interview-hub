@@ -10,9 +10,9 @@ from ..models.problem import Problem, Difficulty, Example
 class MockDB:
     def __init__(self):
         self.users: Dict[str, User] = self._seed_users()
+        self.problems: Dict[str, Problem] = self._seed_problems()  # Seed problems first
         self.sessions: Dict[str, Session] = self._seed_sessions()
-        self.messages: Dict[str, List[ChatMessage]] = {} 
-        self.problems: Dict[str, Problem] = self._seed_problems()
+        self.messages: Dict[str, List[ChatMessage]] = {}
         
     def _seed_users(self) -> Dict[str, User]:
         users = {}
@@ -59,7 +59,7 @@ class MockDB:
             createdAt=datetime.now(),
             participants=[],
             code="def two_sum(nums, target):\n    # Write your code here\n    pass\n",
-            problem=None # Will be linked dynamically or manually if needed
+            problem=self.problems.get("two-sum")  # Link to the Two Sum problem
         )
         # Add participants to session
         # We need to do this carefully if we were using the real join method affecting session.

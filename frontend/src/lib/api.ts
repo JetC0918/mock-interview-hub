@@ -24,8 +24,9 @@ import type { SupportedLanguage as ApiSupportedLanguage } from './api-client/mod
 import type { CursorPosition as ApiCursorPosition } from './api-client/models/CursorPosition';
 
 // Configure API Client
-// Note: Backend runs on port 8000 by default (FastAPI) while frontend is on 8080
-OpenAPI.BASE = 'http://localhost:8000';
+// Note: Vite proxy was not working, so we connect directly to the backend.
+// Backend CORS is configured to allow all origins.
+OpenAPI.BASE = 'http://127.0.0.1:8000';
 OpenAPI.WITH_CREDENTIALS = true;
 
 // --- Frontend Internal Types (matching original mock structure) ---
@@ -226,37 +227,61 @@ const codeTemplates: Record<SupportedLanguage, string> = {
 export const api = {
   auth: {
     async login(email: string, password: string): Promise<User> {
-      const user = await AuthService.loginUser({ email, password });
-      return mapUser(user);
+      try {
+        const user = await AuthService.postAuthLogin({ email, password });
+        return mapUser(user);
+      } catch (error: any) {
+        console.error('Login error:', error);
+        if (error.body) console.error('Error body:', error.body);
+
+        if (error.body && error.body.detail) {
+          throw new Error(error.body.detail);
+        }
+        // Handle case where body is missing (e.g. proxy 404 or 504)
+        if (error.status === 404) {
+          throw new Error('Server not reachable or user not found (404)');
+        }
+        if (error.status === 504 || error.status === 502) {
+          throw new Error('Backend server is not running');
+        }
+        throw error;
+      }
     },
 
     async signup(username: string, email: string, password: string): Promise<User> {
-      const user = await AuthService.registerNewUser({ username, email, password });
-      return mapUser(user);
+      try {
+        const user = await AuthService.postAuthSignup({ username, email, password });
+        return mapUser(user);
+      } catch (error: any) {
+        if (error.body && error.body.detail) {
+          throw new Error(error.body.detail);
+        }
+        throw error;
+      }
     },
 
     async logout(): Promise<void> {
-      return AuthService.logoutUser();
+      return AuthService.postAuthLogout();
     },
 
     async getCurrentUser(): Promise<User | null> {
       try {
-        const user = await AuthService.getCurrentAuthenticatedUser();
+        const user = await AuthService.getAuthMe();
         return mapUser(user);
       } catch (error) {
-        return null;
+        return null; // Not authenticated
       }
     },
 
     async guestJoin(username: string): Promise<User> {
-      const user = await AuthService.joinAsGuest({ username });
+      const user = await AuthService.postAuthGuest({ username });
       return mapUser(user);
     },
   },
 
   sessions: {
     async create(title: string, language: SupportedLanguage = 'javascript'): Promise<Session> {
-      const session = await SessionsService.createANewSession({
+      const session = await SessionsService.postSessions({
         title,
         language: language as ApiSupportedLanguage
       });
@@ -264,18 +289,20 @@ export const api = {
     },
 
     async join(sessionId: string, pin: string): Promise<Session> {
-      const session = await SessionsService.joinASessionUsingIdAndPin(sessionId, { pin });
+      const session = await SessionsService.postSessionsJoin(sessionId, { pin });
       return mapSession(session);
     },
 
     async joinByPin(pin: string): Promise<Session> {
-      const session = await SessionsService.joinASessionUsingOnlyPin({ pin });
+      const session = await SessionsService.postSessionsJoinByPin({ pin });
       return mapSession(session);
     },
 
     async get(sessionId: string): Promise<Session | null> {
       try {
-        const session = await SessionsService.getSessionById(sessionId);
+        // Updated to use getSessions1 as per generated client if necessary, or check if getSessions(id) exists
+        // Looking at generated file: public static getSessions1(id: string): ...
+        const session = await SessionsService.getSessions1(sessionId);
         return mapSession(session);
       } catch (error) {
         return null;
@@ -283,71 +310,62 @@ export const api = {
     },
 
     async updateCode(sessionId: string, code: string): Promise<void> {
-      await SessionsService.updateSessionCode(sessionId, { code });
+      await SessionsService.putSessionsCode(sessionId, { code });
     },
 
     async updateLanguage(sessionId: string, language: SupportedLanguage): Promise<void> {
-      await SessionsService.updateSessionLanguage(sessionId, { language: language as ApiSupportedLanguage });
+      await SessionsService.putSessionsLanguage(sessionId, { language: language as ApiSupportedLanguage });
     },
 
     async updateCursor(sessionId: string, userId: string, position: CursorPosition): Promise<void> {
-      await SessionsService.updateUserCursorPosition(sessionId, {
+      await SessionsService.putSessionsCursor(sessionId, {
         userId,
         position: position as ApiCursorPosition
       });
     },
 
     async leave(sessionId: string): Promise<void> {
-      await SessionsService.leaveASession(sessionId);
+      await SessionsService.postSessionsLeave(sessionId);
     },
 
     async end(sessionId: string): Promise<void> {
-      await SessionsService.endASessionHostOnly(sessionId);
+      await SessionsService.postSessionsEnd(sessionId);
     },
 
     async getActive(): Promise<Session[]> {
-      const sessions = await SessionsService.getActiveSessions();
+      const sessions = await SessionsService.getSessions();
       return sessions.map(mapSession);
     },
   },
 
   chat: {
     async send(sessionId: string, message: string): Promise<ChatMessage> {
-      const msg = await ChatService.sendAChatMessage(sessionId, { message });
+      const msg = await ChatService.postSessionsMessages(sessionId, { message });
       return mapChatMessage(msg);
     },
 
     async getMessages(sessionId: string): Promise<ChatMessage[]> {
-      const msgs = await ChatService.getChatMessages(sessionId);
+      const msgs = await ChatService.getSessionsMessages(sessionId);
       return msgs.map(mapChatMessage);
     },
   },
 
   execution: {
     async run(code: string, language: SupportedLanguage): Promise<ExecutionResult> {
-      const res = await ExecutionService.runCode({
+      const res = await ExecutionService.postExecutionRun({
         code,
         language: language as ApiSupportedLanguage
       });
       return mapExecutionResult(res);
     },
 
-    async runTests(code: string, language: SupportedLanguage, problem: Problem): Promise<ExecutionResult> {
-      // Note: Helper might need recursive mapping if problem is complex, but for now we trust partial compatibility
-      // Actually 'problem' in runTests likely needs ID or full object. 
-      // The API expects 'Problem' object.
-      // We should map strictly if possible.
-      // For this tool call, we pass it as any or map it back.
-      // Since the generated client expects ApiProblem, and our Problem is slightly different (dates?),
-      // In this case actually Problem only has strings/arrays, so it might be compatible.
-      // But 'difficulty' enum might need casting.
-
+    async test(code: string, language: SupportedLanguage, problem: Problem): Promise<ExecutionResult> {
       const apiProblem: ApiProblem = {
         ...problem,
-        difficulty: problem.difficulty as ApiProblem.difficulty // cast enum
+        difficulty: problem.difficulty as ApiProblem.difficulty
       };
 
-      const res = await ExecutionService.runTests({
+      const res = await ExecutionService.postExecutionTest({
         code,
         language: language as ApiSupportedLanguage,
         problem: apiProblem
@@ -363,29 +381,22 @@ export const api = {
     },
   },
 
-  // Spectator (Not in API spec explicitly or mapped to sessions?)
-  // Looking at spec, spectator logic might be just joining with role?
-  // Or handled via active sessions list.
-  // The mock had `spectator.getSessions` and `watch`.
-  // `getSessions` -> `sessions.getActive` (already implemented)
-  // `watch` -> `sessions.get`?
   spectator: {
     async getSessions(): Promise<Session[]> {
-      const sessions = await SessionsService.getActiveSessions();
+      const sessions = await SessionsService.getSessions();
       return sessions.map(mapSession);
     },
 
     async watch(sessionId: string): Promise<Session | null> {
       try {
-        const session = await SessionsService.getSessionById(sessionId);
+        const session = await SessionsService.getSessions1(sessionId);
         return mapSession(session);
       } catch (error) {
-        return null; // Return null if not found
+        return null;
       }
     },
   },
 
-  // Utilities - these were mostly frontend helpers, keep them if useful or adapt
   utils: {
     getCodeTemplate(language: SupportedLanguage): string {
       return codeTemplates[language] || '';

@@ -6,43 +6,44 @@ import { ChatService } from './api-client/services/ChatService';
 import { ExecutionService } from './api-client/services/ExecutionService';
 import { LeaderboardService } from './api-client/services/LeaderboardService';
 
-// Mock the generated services with explicit factories
+// Mock the generated services with explicit libraries
+// We use the names found in the generated files
 vi.mock('./api-client/services/AuthService', () => ({
   AuthService: {
-    loginUser: vi.fn(),
-    registerNewUser: vi.fn(),
-    logoutUser: vi.fn(),
-    getCurrentAuthenticatedUser: vi.fn(),
-    joinAsGuest: vi.fn(),
+    postAuthLogin: vi.fn(),
+    postAuthSignup: vi.fn(),
+    postAuthLogout: vi.fn(),
+    getAuthMe: vi.fn(),
+    postAuthGuest: vi.fn(),
   },
 }));
 
 vi.mock('./api-client/services/SessionsService', () => ({
   SessionsService: {
-    createANewSession: vi.fn(),
-    joinASessionUsingIdAndPin: vi.fn(),
-    joinASessionUsingOnlyPin: vi.fn(),
-    getSessionById: vi.fn(),
-    updateSessionCode: vi.fn(),
-    updateSessionLanguage: vi.fn(),
-    updateUserCursorPosition: vi.fn(),
-    leaveASession: vi.fn(),
-    endASessionHostOnly: vi.fn(),
-    getActiveSessions: vi.fn(),
+    postSessions: vi.fn(),
+    postSessionsJoin: vi.fn(),
+    postSessionsJoinByPin: vi.fn(),
+    getSessions1: vi.fn(), // getSessionById mapped to getSessions1
+    putSessionsCode: vi.fn(),
+    putSessionsLanguage: vi.fn(),
+    putSessionsCursor: vi.fn(),
+    postSessionsLeave: vi.fn(),
+    postSessionsEnd: vi.fn(),
+    getSessions: vi.fn(), // getActiveSessions mapped to getSessions
   },
 }));
 
 vi.mock('./api-client/services/ChatService', () => ({
   ChatService: {
-    sendAChatMessage: vi.fn(),
-    getChatMessages: vi.fn(),
+    postSessionsMessages: vi.fn(), // sendAChatMessage
+    getSessionsMessages: vi.fn(), // getChatMessages
   },
 }));
 
 vi.mock('./api-client/services/ExecutionService', () => ({
   ExecutionService: {
-    runCode: vi.fn(),
-    runTests: vi.fn(),
+    postExecutionRun: vi.fn(), // runCode
+    postExecutionTest: vi.fn(), // runTests
   },
 }));
 
@@ -66,9 +67,9 @@ describe('API Module', () => {
         username: 'test',
         email: 'test@example.com',
         role: 'host',
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString() // API returns string
       };
-      vi.mocked(AuthService.loginUser).mockResolvedValue(mockUser as any);
+      vi.mocked(AuthService.postAuthLogin).mockResolvedValue(mockUser as any);
 
       const user = await api.auth.login('test@example.com', 'password123');
 
@@ -76,12 +77,17 @@ describe('API Module', () => {
       expect(user.email).toBe('test@example.com');
       expect(user.username).toBe('test');
       expect(user.role).toBe('host');
-      expect(AuthService.loginUser).toHaveBeenCalledWith({ email: 'test@example.com', password: 'password123' });
+      expect(AuthService.postAuthLogin).toHaveBeenCalledWith({ email: 'test@example.com', password: 'password123' });
     });
 
-    it('should throw error for invalid login credentials', async () => {
-      vi.mocked(AuthService.loginUser).mockRejectedValue(new Error('Invalid credentials'));
-      await expect(api.auth.login('', '')).rejects.toThrow('Invalid credentials');
+    it('login with invalid credentials throws specific error', async () => {
+      const errorBody = { detail: 'User not found' };
+      const apiError = new Error('Not Found') as any;
+      apiError.body = errorBody;
+
+      vi.mocked(AuthService.postAuthLogin).mockRejectedValue(apiError);
+
+      await expect(api.auth.login('wrong@example.com', 'password')).rejects.toThrow('User not found');
     });
 
     it('should signup a new user', async () => {
@@ -92,7 +98,7 @@ describe('API Module', () => {
         role: 'host',
         createdAt: new Date().toISOString()
       };
-      vi.mocked(AuthService.registerNewUser).mockResolvedValue(mockUser as any);
+      vi.mocked(AuthService.postAuthSignup).mockResolvedValue(mockUser as any);
 
       const user = await api.auth.signup('newuser', 'new@example.com', 'password123');
 
@@ -102,16 +108,16 @@ describe('API Module', () => {
     });
 
     it('should throw error for incomplete signup', async () => {
-      vi.mocked(AuthService.registerNewUser).mockRejectedValue(new Error('All fields required'));
+      vi.mocked(AuthService.postAuthSignup).mockRejectedValue(new Error('All fields required'));
       await expect(api.auth.signup('', 'email@test.com', 'pass')).rejects.toThrow('All fields required');
     });
 
     it('should logout a user', async () => {
-      vi.mocked(AuthService.logoutUser).mockResolvedValue(undefined as any);
-      vi.mocked(AuthService.getCurrentAuthenticatedUser).mockResolvedValue(null as any); // Or throw if not auth
+      vi.mocked(AuthService.postAuthLogout).mockResolvedValue(undefined as any);
+      // Removed dependent mock checking for getCurrentUser as logout doesn't inherently call it in the implementation unless specified
 
       await api.auth.logout();
-      expect(AuthService.logoutUser).toHaveBeenCalled();
+      expect(AuthService.postAuthLogout).toHaveBeenCalled();
     });
 
     it('should join as guest with username', async () => {
@@ -122,7 +128,7 @@ describe('API Module', () => {
         role: 'participant',
         createdAt: new Date().toISOString()
       };
-      vi.mocked(AuthService.joinAsGuest).mockResolvedValue(mockUser as any);
+      vi.mocked(AuthService.postAuthGuest).mockResolvedValue(mockUser as any);
 
       const user = await api.auth.guestJoin('GuestUser');
 
@@ -142,21 +148,20 @@ describe('API Module', () => {
         participants: [{ id: '1', username: 'host' }],
         createdAt: new Date().toISOString()
       };
-      vi.mocked(SessionsService.createANewSession).mockResolvedValue(mockSession as any);
+      vi.mocked(SessionsService.postSessions).mockResolvedValue(mockSession as any);
 
       const session = await api.sessions.create('Interview Session', 'javascript');
 
       expect(session).toBeDefined();
       expect(session.title).toBe('Interview Session');
       expect(session.language).toBe('javascript');
-      // expect(session.pin).toMatch(/^\d{6}$/); // Mocked value
       expect(session.status).toBe('waiting');
       expect(session.participants.length).toBe(1);
     });
 
     it('should get session by id', async () => {
       const mockSession = { id: 'sess1', title: 'Test Session', createdAt: new Date().toISOString() };
-      vi.mocked(SessionsService.getSessionById).mockResolvedValue(mockSession as any);
+      vi.mocked(SessionsService.getSessions1).mockResolvedValue(mockSession as any);
 
       const fetched = await api.sessions.get('sess1');
 
@@ -165,27 +170,27 @@ describe('API Module', () => {
     });
 
     it('should return null for non-existent session', async () => {
-      vi.mocked(SessionsService.getSessionById).mockRejectedValue(new Error('Not found'));
+      vi.mocked(SessionsService.getSessions1).mockRejectedValue(new Error('Not found'));
       const session = await api.sessions.get('non-existent-id');
       expect(session).toBeNull();
     });
 
     it('should update session code', async () => {
-      vi.mocked(SessionsService.updateSessionCode).mockResolvedValue(undefined as any);
+      vi.mocked(SessionsService.putSessionsCode).mockResolvedValue(undefined as any);
       await api.sessions.updateCode('id', 'const x = 42;');
-      expect(SessionsService.updateSessionCode).toHaveBeenCalledWith('id', { code: 'const x = 42;' });
+      expect(SessionsService.putSessionsCode).toHaveBeenCalledWith('id', { code: 'const x = 42;' });
     });
 
     it('should update session language', async () => {
-      vi.mocked(SessionsService.updateSessionLanguage).mockResolvedValue(undefined as any);
+      vi.mocked(SessionsService.putSessionsLanguage).mockResolvedValue(undefined as any);
       await api.sessions.updateLanguage('id', 'python');
-      expect(SessionsService.updateSessionLanguage).toHaveBeenCalledWith('id', { language: 'python' });
+      expect(SessionsService.putSessionsLanguage).toHaveBeenCalledWith('id', { language: 'python' });
     });
 
     it('should end a session', async () => {
-      vi.mocked(SessionsService.endASessionHostOnly).mockResolvedValue(undefined as any);
+      vi.mocked(SessionsService.postSessionsEnd).mockResolvedValue(undefined as any);
       await api.sessions.end('id');
-      expect(SessionsService.endASessionHostOnly).toHaveBeenCalledWith('id');
+      expect(SessionsService.postSessionsEnd).toHaveBeenCalledWith('id');
     });
 
     it('should get active sessions', async () => {
@@ -193,7 +198,7 @@ describe('API Module', () => {
         { id: '1', title: 'Active 1', status: 'active', createdAt: new Date().toISOString() },
         { id: '2', title: 'Active 2', status: 'active', createdAt: new Date().toISOString() }
       ];
-      vi.mocked(SessionsService.getActiveSessions).mockResolvedValue(mockSessions as any);
+      vi.mocked(SessionsService.getSessions).mockResolvedValue(mockSessions as any);
 
       const active = await api.sessions.getActive();
       expect(active.length).toBe(2);
@@ -202,7 +207,6 @@ describe('API Module', () => {
 
   describe('Link Generation', () => {
     it('should generate shareable link for session', async () => {
-      // Utilities are still local but depend on window
       const link = api.utils.generateShareableLink('123');
       expect(link).toContain('/session/');
       expect(link).toContain('123');
@@ -225,7 +229,7 @@ describe('API Module', () => {
   describe('Code Execution', () => {
     it('should execute JavaScript code', async () => {
       const mockResult = { stdout: 'hello', exitCode: 0, executionTime: 10 };
-      vi.mocked(ExecutionService.runCode).mockResolvedValue(mockResult as any);
+      vi.mocked(ExecutionService.postExecutionRun).mockResolvedValue(mockResult as any);
 
       const result = await api.execution.run('console.log("hello")', 'javascript');
 
@@ -237,15 +241,15 @@ describe('API Module', () => {
   describe('Chat', () => {
     it('should send and retrieve chat messages', async () => {
       const mockMsg = { id: 'm1', message: 'Hello!', timestamp: new Date().toISOString() };
-      vi.mocked(ChatService.sendAChatMessage).mockResolvedValue(mockMsg as any);
+      vi.mocked(ChatService.postSessionsMessages).mockResolvedValue(mockMsg as any);
 
       await api.chat.send('s1', 'Hello!');
-      expect(ChatService.sendAChatMessage).toHaveBeenCalledWith('s1', { message: 'Hello!' });
+      expect(ChatService.postSessionsMessages).toHaveBeenCalledWith('s1', { message: 'Hello!' });
     });
 
     it('should get messages', async () => {
       const mockMsgs = [{ id: 'm1', message: 'Hello!', timestamp: new Date().toISOString() }];
-      vi.mocked(ChatService.getChatMessages).mockResolvedValue(mockMsgs as any);
+      vi.mocked(ChatService.getSessionsMessages).mockResolvedValue(mockMsgs as any);
 
       const msgs = await api.chat.getMessages('s1');
       expect(msgs.length).toBe(1);

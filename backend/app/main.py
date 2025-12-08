@@ -9,9 +9,18 @@ app = FastAPI(
 )
 
 # CORS (Allow all for development)
+# Logging Middleware
+from fastapi import Request
+@app.middleware("http")
+async def log_requests(request: Request, call_next):
+    print(f"DEBUG LOG: Incoming Request path: {request.url.path}")
+    response = await call_next(request)
+    print(f"DEBUG LOG: Response status: {response.status_code}")
+    return response
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["http://localhost:8080", "http://127.0.0.1:8080"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

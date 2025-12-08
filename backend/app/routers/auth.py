@@ -8,10 +8,15 @@ router = APIRouter(prefix="/auth", tags=["Auth"])
 @router.post("/login", response_model=User)
 def login(user_in: UserLogin):
     user = db.get_user_by_email(user_in.email)
-    if not user or user_in.password != "password": # Mock password check
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
+        )
+    if user_in.password != "password": # Mock password check
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
+            detail="Incorrect password"
         )
     return user
 
