@@ -1,7 +1,7 @@
 """Database service layer providing same interface as MockDB for seamless migration."""
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, UTC
 from typing import List, Optional
 from sqlalchemy.orm import Session as DBSession
 import bcrypt
@@ -56,7 +56,7 @@ class DatabaseService:
             password_hash=password_hash,
             role=RoleEnum(role.value) if role else None,
             avatar=f"https://api.dicebear.com/7.x/avataaars/svg?seed={username}",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(db_user)
         self.db.commit()
@@ -114,7 +114,7 @@ class DatabaseService:
             language=SupportedLanguageEnum(language.value),
             status=SessionStatusEnum.WAITING,
             code="",
-            created_at=datetime.utcnow()
+            created_at=datetime.now(UTC)
         )
         self.db.add(db_session)
         self.db.commit()
@@ -154,7 +154,7 @@ class DatabaseService:
                 session_id=session_id,
                 user_id=user.id,
                 role=role,
-                joined_at=datetime.utcnow()
+                joined_at=datetime.now(UTC)
             )
             self.db.add(participant)
             self.db.commit()
@@ -219,7 +219,7 @@ class DatabaseService:
             user_id=user_id,
             username=username,
             message=text,
-            timestamp=datetime.utcnow()
+            timestamp=datetime.now(UTC)
         )
         self.db.add(db_msg)
         self.db.commit()
