@@ -1,0 +1,617 @@
+openapi: 3.0.0
+info:
+  title: CodioLive API
+  description: Backend API for CodioLive (Mock Interview Hub)
+  version: 1.0.0
+servers:
+  - url: http://localhost:3000/api
+    description: Local Development Server
+
+paths:
+  # Auth
+  /auth/login:
+    post:
+      summary: Login user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [email, password]
+              properties:
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '200':
+          description: Successful login
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Invalid credentials
+
+  /auth/signup:
+    post:
+      summary: Register new user
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, email, password]
+              properties:
+                username:
+                  type: string
+                email:
+                  type: string
+                  format: email
+                password:
+                  type: string
+      responses:
+        '201':
+          description: User created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '400':
+          description: Invalid input
+
+  /auth/logout:
+    post:
+      summary: Logout user
+      tags: [Auth]
+      responses:
+        '200':
+          description: Successfully logged out
+
+  /auth/me:
+    get:
+      summary: Get current authenticated user
+      tags: [Auth]
+      responses:
+        '200':
+          description: Current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+        '401':
+          description: Not authenticated
+
+  /auth/guest:
+    post:
+      summary: Join as guest
+      tags: [Auth]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username]
+              properties:
+                username:
+                  type: string
+      responses:
+        '201':
+          description: Guest user created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/User'
+
+  # Sessions
+  /sessions:
+    get:
+      summary: Get active sessions
+      tags: [Sessions]
+      responses:
+        '200':
+          description: List of active sessions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Session'
+    post:
+      summary: Create a new session
+      tags: [Sessions]
+      security:
+        - cookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [title]
+              properties:
+                title:
+                  type: string
+                language:
+                  $ref: '#/components/schemas/SupportedLanguage'
+      responses:
+        '201':
+          description: Session created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+
+  /sessions/{id}:
+    get:
+      summary: Get session by ID
+      tags: [Sessions]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: Session details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          description: Session not found
+
+  /sessions/{id}/join:
+    post:
+      summary: Join a session using ID and PIN
+      tags: [Sessions]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pin]
+              properties:
+                pin:
+                  type: string
+      responses:
+        '200':
+          description: Successfully joined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '403':
+          description: Invalid PIN
+
+  /sessions/join-by-pin:
+    post:
+      summary: Join a session using only PIN
+      tags: [Sessions]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [pin]
+              properties:
+                pin:
+                  type: string
+      responses:
+        '200':
+          description: Successfully joined
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Session'
+        '404':
+          description: Session not found
+
+  /sessions/{id}/code:
+    put:
+      summary: Update session code
+      tags: [Sessions]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code:
+                  type: string
+      responses:
+        '200':
+          description: Code updated
+
+  /sessions/{id}/language:
+    put:
+      summary: Update session language
+      tags: [Sessions]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [language]
+              properties:
+                language:
+                  $ref: '#/components/schemas/SupportedLanguage'
+      responses:
+        '200':
+          description: Language updated
+
+  /sessions/{id}/cursor:
+    put:
+      summary: Update user cursor position
+      tags: [Sessions]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId, position]
+              properties:
+                userId:
+                  type: string
+                position:
+                  $ref: '#/components/schemas/CursorPosition'
+      responses:
+        '200':
+          description: Cursor updated
+
+  /sessions/{id}/leave:
+    post:
+      summary: Leave a session
+      tags: [Sessions]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: Left session
+
+  /sessions/{id}/end:
+    post:
+      summary: End a session (Host only)
+      tags: [Sessions]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: Session ended
+
+  # Chat
+  /sessions/{id}/messages:
+    get:
+      summary: Get chat messages
+      tags: [Chat]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      responses:
+        '200':
+          description: List of messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatMessage'
+    post:
+      summary: Send a chat message
+      tags: [Chat]
+      parameters:
+        - in: path
+          name: id
+          schema:
+            type: string
+          required: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [message]
+              properties:
+                message:
+                  type: string
+      responses:
+        '201':
+          description: Message sent
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatMessage'
+
+  # Execution
+  /execution/run:
+    post:
+      summary: Run code
+      tags: [Execution]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, language]
+              properties:
+                code:
+                  type: string
+                language:
+                  $ref: '#/components/schemas/SupportedLanguage'
+      responses:
+        '200':
+          description: Execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionResult'
+
+  /execution/test:
+    post:
+      summary: Run tests
+      tags: [Execution]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code, language, problem]
+              properties:
+                code:
+                  type: string
+                language:
+                  $ref: '#/components/schemas/SupportedLanguage'
+                problem:
+                  $ref: '#/components/schemas/Problem'
+      responses:
+        '200':
+          description: Test execution result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ExecutionResult'
+
+  # Leaderboard
+  /leaderboard:
+    get:
+      summary: Get leaderboard
+      tags: [Leaderboard]
+      responses:
+        '200':
+          description: Leaderboard data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaderboardEntry'
+
+components:
+  securitySchemes:
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: session_id
+
+  schemas:
+    User:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        email:
+          type: string
+        avatar:
+          type: string
+        role:
+          type: string
+          enum: [host, participant, spectator]
+        createdAt:
+          type: string
+          format: date-time
+
+    Session:
+      type: object
+      properties:
+        id:
+          type: string
+        pin:
+          type: string
+        hostId:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        language:
+          $ref: '#/components/schemas/SupportedLanguage'
+        participants:
+          type: array
+          items:
+            $ref: '#/components/schemas/Participant'
+        code:
+          type: string
+        status:
+          type: string
+          enum: [waiting, active, ended]
+        createdAt:
+          type: string
+          format: date-time
+        problem:
+          $ref: '#/components/schemas/Problem'
+
+    Participant:
+      type: object
+      properties:
+        id:
+          type: string
+        username:
+          type: string
+        avatar:
+          type: string
+        role:
+          type: string
+          enum: [host, participant, spectator]
+        cursorPosition:
+          $ref: '#/components/schemas/CursorPosition'
+        isTyping:
+          type: boolean
+        color:
+          type: string
+        joinedAt:
+          type: string
+          format: date-time
+
+    CursorPosition:
+      type: object
+      properties:
+        line:
+          type: number
+        column:
+          type: number
+
+    SupportedLanguage:
+      type: string
+      enum: [javascript, typescript, python, java, cpp, go]
+
+    Problem:
+      type: object
+      properties:
+        id:
+          type: string
+        title:
+          type: string
+        description:
+          type: string
+        examples:
+          type: array
+          items:
+            type: object
+            properties:
+              input:
+                type: string
+              output:
+                type: string
+              explanation:
+                type: string
+        constraints:
+          type: array
+          items:
+            type: string
+        difficulty:
+          type: string
+          enum: [easy, medium, hard]
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: string
+        participantId:
+          type: string
+        username:
+          type: string
+        message:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+
+    ExecutionResult:
+      type: object
+      properties:
+        stdout:
+          type: string
+        stderr:
+          type: string
+        exitCode:
+          type: number
+        executionTime:
+          type: number
+        testResults:
+          type: array
+          items:
+            $ref: '#/components/schemas/TestResult'
+
+    TestResult:
+      type: object
+      properties:
+        passed:
+          type: boolean
+        input:
+          type: string
+        expected:
+          type: string
+        actual:
+          type: string
+
+    LeaderboardEntry:
+      type: object
+      properties:
+        rank:
+          type: number
+        userId:
+          type: string
+        username:
+          type: string
+        avatar:
+          type: string
+        sessionsCompleted:
+          type: number
+        avgScore:
+          type: number
+        totalTime:
+          type: string
