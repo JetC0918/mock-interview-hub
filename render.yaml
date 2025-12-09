@@ -33,6 +33,3 @@ services:
     dockerfilePath: ./frontend/Dockerfile.render
     dockerContext: ./frontend
     plan: free  # Change to 'starter' ($7/mo) for production
-    envVars:
-      - key: BACKEND_URL
-        value: https://mock-interview-backend-yjld.onrender.com
