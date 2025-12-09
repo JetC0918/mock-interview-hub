@@ -35,7 +35,4 @@ services:
     plan: free  # Change to 'starter' ($7/mo) for production
     envVars:
       - key: BACKEND_URL
-        fromService:
-          type: web
-          name: mock-interview-backend
-          property: hostport
+        value: https://mock-interview-backend.onrender.com
