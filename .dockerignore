@@ -1,0 +1,41 @@
+# Node
+node_modules/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.venv/
+venv/
+.pytest_cache/
+
+# Build output
+frontend/dist/
+
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Test directories
+backend/tests/
+backend/tests_integration/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Misc
+.git/
+.gitignore
+*.md
+!README.md
+
+# TypeScript build info
+*.tsbuildinfo
+
+# Lock files for frontend (will use package-lock.json)
+bun.lockb

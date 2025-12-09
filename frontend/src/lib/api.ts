@@ -8,7 +8,9 @@ import { OpenAPI } from './api-client/core/OpenAPI';
 import { AuthService } from './api-client/services/AuthService';
 import { SessionsService } from './api-client/services/SessionsService';
 import { ChatService } from './api-client/services/ChatService';
-import { ExecutionService } from './api-client/services/ExecutionService';
+
+// Browser-based code execution (WASM)
+import { executeCode, runTests } from './codeExecutor';
 
 
 // Import generated types as 'Api*' to avoid conflicts
@@ -17,16 +19,15 @@ import type { Session as ApiSession } from './api-client/models/Session';
 import type { Participant as ApiParticipant } from './api-client/models/Participant';
 import type { Problem as ApiProblem } from './api-client/models/Problem';
 import type { ChatMessage as ApiChatMessage } from './api-client/models/ChatMessage';
-import type { ExecutionResult as ApiExecutionResult } from './api-client/models/ExecutionResult';
-import type { TestResult as ApiTestResult } from './api-client/models/TestResult';
+// Note: ExecutionResult and TestResult types are defined locally since
+// code execution now happens in the browser via WASM, not the backend.
 
 import type { SupportedLanguage as ApiSupportedLanguage } from './api-client/models/SupportedLanguage';
 import type { CursorPosition as ApiCursorPosition } from './api-client/models/CursorPosition';
 
 // Configure API Client
-// Note: Vite proxy was not working, so we connect directly to the backend.
-// Backend CORS is configured to allow all origins.
-OpenAPI.BASE = 'http://127.0.0.1:8000';
+// Use relative /api path - works with both Vite dev proxy and nginx production proxy
+OpenAPI.BASE = '/api';
 OpenAPI.WITH_CREDENTIALS = true;
 
 // --- Frontend Internal Types (matching original mock structure) ---
@@ -176,20 +177,7 @@ function mapChatMessage(apiMsg: ApiChatMessage): ChatMessage {
   };
 }
 
-function mapExecutionResult(apiRes: ApiExecutionResult): ExecutionResult {
-  return {
-    stdout: apiRes.stdout || '',
-    stderr: apiRes.stderr || '',
-    exitCode: apiRes.exitCode || 0,
-    executionTime: apiRes.executionTime || 0,
-    testResults: apiRes.testResults?.map(tr => ({
-      passed: tr.passed || false,
-      input: tr.input || '',
-      expected: tr.expected || '',
-      actual: tr.actual || ''
-    })),
-  };
-}
+// Note: mapExecutionResult removed - execution now happens in browser via WASM
 
 
 
@@ -334,25 +322,13 @@ export const api = {
 
   execution: {
     async run(code: string, language: SupportedLanguage): Promise<ExecutionResult> {
-      const res = await ExecutionService.postExecutionRun({
-        code,
-        language: language as ApiSupportedLanguage
-      });
-      return mapExecutionResult(res);
+      // Execute code locally in the browser using WASM for security
+      return executeCode(code, language);
     },
 
     async test(code: string, language: SupportedLanguage, problem: Problem): Promise<ExecutionResult> {
-      const apiProblem: ApiProblem = {
-        ...problem,
-        difficulty: problem.difficulty as ApiProblem.difficulty
-      };
-
-      const res = await ExecutionService.postExecutionTest({
-        code,
-        language: language as ApiSupportedLanguage,
-        problem: apiProblem
-      });
-      return mapExecutionResult(res);
+      // Run tests locally in the browser using WASM for security
+      return runTests(code, language, problem);
     },
   },
 
