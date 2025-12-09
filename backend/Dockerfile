@@ -4,6 +4,12 @@ FROM python:3.12-slim
 # Set working directory
 WORKDIR /app
 
+# Install Node.js for JavaScript code execution
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    nodejs \
+    npm \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install uv
 RUN pip install uv
 

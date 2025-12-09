@@ -31,6 +31,12 @@ def create_session(session_in: SessionCreate, service: DatabaseService = Depends
         host_id=user.id,
         language=session_in.language or SupportedLanguage.PYTHON
     )
+    
+    # Auto-assign a problem to the session
+    problem = service.get_random_problem()
+    if problem:
+        service.assign_problem_to_session(session.id, problem.id)
+    
     # Host joins automatically
     service.join_session(session.id, user)
     return service.get_session(session.id)

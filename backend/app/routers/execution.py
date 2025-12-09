@@ -1,6 +1,9 @@
 from fastapi import APIRouter, HTTPException
 from ..models.execution import ExecutionRequest, TestRequest, ExecutionResult, TestResult
-from ..services.code_executor import execute_python_code, execute_with_input
+from ..services.code_executor import (
+    execute_python_code, execute_with_input,
+    execute_javascript_code, execute_javascript_with_input
+)
 from ..services.mock_db import db
 import json
 
@@ -10,16 +13,18 @@ router = APIRouter(prefix="/execution", tags=["Execution"])
 def run_code(body: ExecutionRequest):
     """Actually execute the submitted code and return real output."""
     
-    if body.language != "python":
-        # For non-Python, return a message that only Python is supported
+    if body.language == "python":
+        stdout, stderr, exit_code, execution_time = execute_python_code(body.code)
+    elif body.language == "javascript":
+        stdout, stderr, exit_code, execution_time = execute_javascript_code(body.code)
+    else:
+        # For other languages, return a message that they're not yet supported
         return ExecutionResult(
             stdout="",
-            stderr=f"Language '{body.language}' is not yet supported. Only Python execution is available.",
+            stderr=f"Language '{body.language}' is not yet supported. Python and JavaScript are available.",
             exitCode=1,
             executionTime=0.0
         )
-    
-    stdout, stderr, exit_code, execution_time = execute_python_code(body.code)
     
     return ExecutionResult(
         stdout=stdout,
@@ -32,10 +37,12 @@ def run_code(body: ExecutionRequest):
 def run_tests(body: TestRequest):
     """Run the code against the problem's test cases."""
     
-    if body.language != "python":
+    # Check if language is supported for testing
+    supported_languages = ["python", "javascript"]
+    if body.language not in supported_languages:
         return ExecutionResult(
             stdout="",
-            stderr=f"Language '{body.language}' is not yet supported for testing. Only Python is available.",
+            stderr=f"Language '{body.language}' is not yet supported for testing. Python and JavaScript are available.",
             exitCode=1,
             executionTime=0.0
         )
@@ -57,8 +64,11 @@ def run_tests(body: TestRequest):
         input_str = example.input
         expected_output = example.output.strip()
         
-        # Execute the code with this test case
-        stdout, stderr, exit_code = execute_with_input(body.code, input_str)
+        # Execute the code with this test case based on language
+        if body.language == "python":
+            stdout, stderr, exit_code = execute_with_input(body.code, input_str)
+        else:  # javascript
+            stdout, stderr, exit_code = execute_javascript_with_input(body.code, input_str)
         
         # Check if output matches expected
         # Normalize outputs for comparison (handle list format variations)

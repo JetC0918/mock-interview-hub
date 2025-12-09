@@ -44,8 +44,8 @@ class TestExecutionIntegration:
         # Should have error in stderr
         assert result["stderr"] != "" or "SyntaxError" in result.get("stdout", "")
 
-    def test_run_javascript_code_not_supported(self, client: TestClient):
-        """Test that JavaScript code returns not supported message."""
+    def test_run_javascript_code(self, client: TestClient):
+        """Test running JavaScript code."""
         code_data = {
             "code": "console.log('Hello from JS!')",
             "language": "javascript"
@@ -54,9 +54,9 @@ class TestExecutionIntegration:
         
         assert response.status_code == 200
         result = response.json()
-        # JavaScript is not supported, should get error message
-        assert "not yet supported" in result["stderr"].lower()
-        assert result["exitCode"] == 1
+        # JavaScript is now supported
+        assert "Hello from JS!" in result["stdout"]
+        assert result["exitCode"] == 0
 
     def test_unsupported_language_returns_error(self, client: TestClient):
         """Test that unsupported languages return proper error."""

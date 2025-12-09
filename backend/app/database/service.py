@@ -277,6 +277,20 @@ class DatabaseService:
         db_problems = self.db.query(ProblemModel).all()
         return [self._problem_model_to_pydantic(p) for p in db_problems]
 
+    def assign_problem_to_session(self, session_id: str, problem_id: str) -> bool:
+        """Assign a problem to a session."""
+        db_session = self.db.query(SessionModel).filter(SessionModel.id == session_id).first()
+        if not db_session:
+            return False
+        db_session.problem_id = problem_id
+        self.db.commit()
+        return True
+
+    def get_random_problem(self) -> Optional[Problem]:
+        """Get a random problem from the database."""
+        db_problem = self.db.query(ProblemModel).first()
+        return self._problem_model_to_pydantic(db_problem) if db_problem else None
+
     # ==================== Conversion Helpers ====================
 
     def _user_model_to_pydantic(self, db_user: UserModel) -> User:
@@ -424,6 +438,9 @@ def seed_database(db: DBSession):
         host_id=host.id,
         language=SupportedLanguage.PYTHON
     )
+    
+    # Assign the Two Sum problem to this session
+    service.assign_problem_to_session(session.id, "two-sum")
     
     # Update session with initial code and status
     service.update_session_code(
