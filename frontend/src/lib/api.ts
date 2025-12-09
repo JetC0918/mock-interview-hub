@@ -332,6 +332,43 @@ export const api = {
     },
   },
 
+  ai: {
+    async getGuidance(sessionId: string, message: string, problemContext?: Problem): Promise<ChatMessage> {
+      const response = await fetch('/api/ai/assist', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          sessionId,
+          message,
+          problemContext: problemContext ? {
+            title: problemContext.title,
+            description: problemContext.description,
+            examples: problemContext.examples,
+            constraints: problemContext.constraints,
+            difficulty: problemContext.difficulty,
+          } : undefined,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ detail: 'AI service unavailable' }));
+        throw new Error(error.detail || 'Failed to get AI guidance');
+      }
+
+      const data = await response.json();
+      return {
+        id: data.id,
+        participantId: data.participantId,
+        username: data.username,
+        message: data.message,
+        timestamp: new Date(data.timestamp),
+      };
+    },
+  },
+
 
 
   spectator: {

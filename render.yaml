@@ -25,6 +25,8 @@ services:
         generateValue: true
       - key: PYTHONUNBUFFERED
         value: "1"
+      - key: GEMINI_API_KEY
+        sync: false
 
   # React Frontend with Nginx
   - type: web

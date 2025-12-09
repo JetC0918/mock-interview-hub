@@ -39,6 +39,7 @@ const SessionPage: React.FC = () => {
   const [isRunning, setIsRunning] = useState(false);
   const [executionResult, setExecutionResult] = useState<ExecutionResult | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
+  const [isAILoading, setIsAILoading] = useState(false);
   const [copied, setCopied] = useState(false);
 
   // Guest join state
@@ -226,8 +227,35 @@ const SessionPage: React.FC = () => {
     try {
       const chatMessage = await api.chat.send(session.id, message);
       setChatMessages((prev) => [...prev, chatMessage]);
+
+      // Check if message triggers AI
+      if (message.toLowerCase().includes('@ai')) {
+        handleAIAssist(message);
+      }
     } catch (error) {
       console.error('Failed to send message:', error);
+    }
+  };
+
+  const handleAIAssist = async (message: string) => {
+    if (!session) return;
+
+    setIsAILoading(true);
+    try {
+      const aiResponse = await api.ai.getGuidance(
+        session.id,
+        message,
+        session.problem
+      );
+      setChatMessages((prev) => [...prev, aiResponse]);
+    } catch (error: any) {
+      toast({
+        title: 'AI Assistant Error',
+        description: error.message || 'Failed to get AI guidance',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsAILoading(false);
     }
   };
 
@@ -464,6 +492,7 @@ const SessionPage: React.FC = () => {
                     participants={allParticipants}
                     onSendMessage={handleSendMessage}
                     currentUserId={user.id}
+                    isAILoading={isAILoading}
                   />
                 </TabsContent>
               </Tabs>
