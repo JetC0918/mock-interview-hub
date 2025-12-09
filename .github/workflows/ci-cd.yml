@@ -8,7 +8,7 @@ on:
 
 jobs:
   test-backend:
-    name: Backend Tests
+    name: Backend Unit Tests
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -27,8 +27,32 @@ jobs:
       - name: Install dependencies
         run: uv sync
       
-      - name: Run tests
-        run: uv run pytest
+      - name: Run unit tests
+        run: uv run pytest tests/
+
+  test-backend-integration:
+    name: Backend Integration Tests
+    needs: test-backend
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./backend
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install uv
+        run: pip install uv
+      
+      - name: Install dependencies
+        run: uv sync
+      
+      - name: Run integration tests
+        run: uv run pytest tests_integration/
 
   test-frontend:
     name: Frontend Tests
@@ -59,7 +83,7 @@ jobs:
   #
   # deploy:
   #   name: Deploy to Render
-  #   needs: [test-backend, test-frontend]
+  #   needs: [test-backend, test-backend-integration, test-frontend]
   #   runs-on: ubuntu-latest
   #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
   #   steps:
