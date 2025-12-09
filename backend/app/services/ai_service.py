@@ -39,7 +39,7 @@ Remember: Your goal is to help them LEARN, not to solve it for them."""
         
         genai.configure(api_key=api_key)
         self.model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash-preview-05-20",
+            model_name="gemini-2.5-flash",
             system_instruction=self.SYSTEM_PROMPT
         )
 
