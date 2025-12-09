@@ -1,4 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends, status
+from fastapi import APIRouter, HTTPException, Depends, status, Response, Cookie
+from typing import Optional
 from sqlalchemy.orm import Session as DBSession
 from ..models.user import User, UserCreate, UserLogin
 from ..database.config import get_db
@@ -6,13 +7,17 @@ from ..database.service import DatabaseService
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
+# Cookie settings
+COOKIE_NAME = "user_id"
+COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
+
 
 def get_service(db: DBSession = Depends(get_db)) -> DatabaseService:
     return DatabaseService(db)
 
 
 @router.post("/login", response_model=User)
-def login(user_in: UserLogin, service: DatabaseService = Depends(get_service)):
+def login(user_in: UserLogin, response: Response, service: DatabaseService = Depends(get_service)):
     result = service.get_user_by_email_with_hash(user_in.email)
     if not result:
         raise HTTPException(
@@ -26,11 +31,20 @@ def login(user_in: UserLogin, service: DatabaseService = Depends(get_service)):
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Incorrect password"
         )
+    
+    # Set session cookie
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=user.id,
+        max_age=COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax"
+    )
     return user
 
 
 @router.post("/signup", response_model=User, status_code=201)
-def signup(user_in: UserCreate, service: DatabaseService = Depends(get_service)):
+def signup(user_in: UserCreate, response: Response, service: DatabaseService = Depends(get_service)):
     if user_in.email and service.get_user_by_email(user_in.email):
         raise HTTPException(
             status_code=400,
@@ -41,26 +55,50 @@ def signup(user_in: UserCreate, service: DatabaseService = Depends(get_service))
         email=user_in.email,
         password=user_in.password
     )
+    
+    # Set session cookie
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=user.id,
+        max_age=COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax"
+    )
     return user
 
 
 @router.post("/guest", response_model=User, status_code=201)
-def guest_login(user_in: UserCreate, service: DatabaseService = Depends(get_service)):
+def guest_login(user_in: UserCreate, response: Response, service: DatabaseService = Depends(get_service)):
     # Guest logic: create temp user without email/password
     user = service.create_user(user_in.username, None)
+    
+    # Set session cookie
+    response.set_cookie(
+        key=COOKIE_NAME,
+        value=user.id,
+        max_age=COOKIE_MAX_AGE,
+        httponly=True,
+        samesite="lax"
+    )
     return user
 
 
 @router.post("/logout")
-def logout():
+def logout(response: Response):
+    # Clear the session cookie
+    response.delete_cookie(key=COOKIE_NAME)
     return {"message": "Successfully logged out"}
 
 
 @router.get("/me", response_model=User)
-def get_current_user(service: DatabaseService = Depends(get_service)):
-    # In real app, get from token dependency
-    # For now, return first user for mock simplicity
-    user = service.get_first_user()
-    if not user:
+def get_current_user(
+    user_id: Optional[str] = Cookie(None, alias=COOKIE_NAME),
+    service: DatabaseService = Depends(get_service)
+):
+    if not user_id:
         raise HTTPException(status_code=401, detail="Not authenticated")
+    
+    user = service.get_user(user_id)
+    if not user:
+        raise HTTPException(status_code=401, detail="User not found")
     return user
