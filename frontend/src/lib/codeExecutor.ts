@@ -31,7 +31,7 @@ async function loadPyodide(): Promise<any> {
         // Dynamic import of pyodide
         const { loadPyodide: loadPyodideModule } = await import('pyodide');
         pyodideInstance = await loadPyodideModule({
-            indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.24.1/full/',
+            indexURL: 'https://cdn.jsdelivr.net/pyodide/v0.29.0/full/',
         });
         return pyodideInstance;
     })();
