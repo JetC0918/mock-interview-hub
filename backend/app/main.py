@@ -53,3 +53,9 @@ app.include_router(execution.router)
 @app.get("/")
 def read_root():
     return {"message": "Welcome to CodioLive API"}
+
+
+@app.get("/health")
+def health_check():
+    """Health check endpoint for Render and load balancers."""
+    return {"status": "healthy"}

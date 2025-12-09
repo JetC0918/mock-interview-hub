@@ -1,0 +1,41 @@
+# Render Blueprint - Infrastructure as Code
+# https://docs.render.com/blueprint-spec
+
+databases:
+  - name: mock-interview-db
+    databaseName: codiolive
+    user: codiolive
+    plan: free  # Change to 'starter' ($7/mo) for production
+
+services:
+  # FastAPI Backend
+  - type: web
+    name: mock-interview-backend
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: ./backend
+    plan: free  # Change to 'starter' ($7/mo) for production
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mock-interview-db
+          property: connectionString
+      - key: SECRET_KEY
+        generateValue: true
+      - key: PYTHONUNBUFFERED
+        value: "1"
+
+  # React Frontend with Nginx
+  - type: web
+    name: mock-interview-frontend
+    runtime: docker
+    dockerfilePath: ./frontend/Dockerfile.render
+    dockerContext: ./frontend
+    plan: free  # Change to 'starter' ($7/mo) for production
+    envVars:
+      - key: BACKEND_URL
+        fromService:
+          type: web
+          name: mock-interview-backend
+          property: hostport
