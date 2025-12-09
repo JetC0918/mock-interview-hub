@@ -47,70 +47,29 @@ const SessionPage: React.FC = () => {
   const [joinPin, setJoinPin] = useState('');
   const [isJoining, setIsJoining] = useState(false);
 
-  // Simulated collaborators
-  const [mockParticipants, setMockParticipants] = useState<Participant[]>([]);
-
   useEffect(() => {
     if (sessionId && user) {
       loadSession();
     }
   }, [sessionId, user]);
 
-  // Simulate other participants typing
+  // Polling to refresh session participants
   useEffect(() => {
     if (!session) return;
 
-    const interval = setInterval(() => {
-      setMockParticipants((prev) => {
-        if (prev.length === 0) return prev;
-
-        const randomIndex = Math.floor(Math.random() * prev.length);
-        const updated = [...prev];
-        updated[randomIndex] = {
-          ...updated[randomIndex],
-          isTyping: Math.random() > 0.7,
-          cursorPosition: {
-            line: Math.floor(Math.random() * 15) + 1,
-            column: Math.floor(Math.random() * 40) + 1,
-          },
-        };
-        return updated;
-      });
-    }, 2000);
+    const interval = setInterval(async () => {
+      try {
+        const sessionData = await api.sessions.get(sessionId!);
+        if (sessionData) {
+          setSession(sessionData);
+        }
+      } catch (error) {
+        console.error('Failed to refresh session:', error);
+      }
+    }, 5000);
 
     return () => clearInterval(interval);
-  }, [session]);
-
-  // Add mock participants after joining
-  useEffect(() => {
-    if (session && user) {
-      const mockUsers: Participant[] = [
-        {
-          id: 'mock-1',
-          username: 'alex_dev',
-          role: 'participant',
-          color: 'hsl(265 70% 60%)',
-          joinedAt: new Date(),
-          cursorPosition: { line: 5, column: 10 },
-        },
-        {
-          id: 'mock-2',
-          username: 'sarah_codes',
-          role: 'spectator',
-          color: 'hsl(38 92% 50%)',
-          joinedAt: new Date(),
-        },
-      ];
-
-      setTimeout(() => {
-        setMockParticipants(mockUsers);
-        toast({
-          title: 'alex_dev joined',
-          description: 'A participant has joined the session',
-        });
-      }, 3000);
-    }
-  }, [session, user]);
+  }, [session, sessionId]);
 
   const loadSession = async () => {
     try {
@@ -272,9 +231,7 @@ const SessionPage: React.FC = () => {
   };
 
   const languages = api.utils.getSupportedLanguages();
-  const allParticipants = session
-    ? [...session.participants, ...mockParticipants]
-    : [];
+  const allParticipants = session ? session.participants : [];
 
   // Guest join screen
   if (!user) {

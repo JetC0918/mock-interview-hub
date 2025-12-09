@@ -1,5 +1,5 @@
-from fastapi import APIRouter, HTTPException, Depends, status
-from typing import List
+from fastapi import APIRouter, HTTPException, Depends, status, Cookie
+from typing import List, Optional
 from sqlalchemy.orm import Session as DBSession
 from ..models.session import Session, SessionCreate, SessionJoin, Participant
 from ..models.execution import ChatMessage, ChatMessageCreate
@@ -9,9 +9,17 @@ from ..database.service import DatabaseService
 
 router = APIRouter(prefix="/sessions", tags=["Sessions"])
 
+# Cookie name (must match auth.py)
+COOKIE_NAME = "user_id"
+
 
 def get_service(db: DBSession = Depends(get_db)) -> DatabaseService:
     return DatabaseService(db)
+
+
+def get_current_user_id(user_id: Optional[str] = Cookie(None, alias=COOKIE_NAME)) -> Optional[str]:
+    """Get current user ID from session cookie."""
+    return user_id
 
 
 @router.get("/", response_model=List[Session])
@@ -20,11 +28,20 @@ def get_sessions(service: DatabaseService = Depends(get_service)):
 
 
 @router.post("/", response_model=Session, status_code=201)
-def create_session(session_in: SessionCreate, service: DatabaseService = Depends(get_service)):
-    # Get current user (use first user for mock)
-    user = service.get_first_user()
+def create_session(
+    session_in: SessionCreate,
+    current_user_id: Optional[str] = Depends(get_current_user_id),
+    service: DatabaseService = Depends(get_service)
+):
+    # Get current user from session cookie
+    user = None
+    if current_user_id:
+        user = service.get_user(current_user_id)
     if not user:
-        user = service.create_user("Host", "host@example.com")
+        # Fallback for unauthenticated users
+        user = service.get_first_user()
+        if not user:
+            user = service.create_user("Host", "host@example.com")
     
     session = service.create_session(
         title=session_in.title,
@@ -51,33 +68,52 @@ def get_session(id: str, service: DatabaseService = Depends(get_service)):
 
 
 @router.post("/{id}/join", response_model=Session)
-def join_session(id: str, body: SessionJoin, service: DatabaseService = Depends(get_service)):
+def join_session(
+    id: str,
+    body: SessionJoin,
+    current_user_id: Optional[str] = Depends(get_current_user_id),
+    service: DatabaseService = Depends(get_service)
+):
     session = service.get_session(id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     if session.pin != body.pin:
         raise HTTPException(status_code=403, detail="Invalid PIN")
     
-    # Get last user for mock (simulating current user)
-    user = service.get_last_user()
+    # Get current user from session cookie
+    user = None
+    if current_user_id:
+        user = service.get_user(current_user_id)
     if not user:
-        user = service.create_user("Participant", None)
+        # Fallback for unauthenticated users
+        user = service.get_last_user()
+        if not user:
+            user = service.create_user("Participant", None)
     
     updated_session = service.join_session(id, user)
     return updated_session
 
 
 @router.post("/join-by-pin", response_model=Session)
-def join_by_pin(body: SessionJoin, service: DatabaseService = Depends(get_service)):
+def join_by_pin(
+    body: SessionJoin,
+    current_user_id: Optional[str] = Depends(get_current_user_id),
+    service: DatabaseService = Depends(get_service)
+):
     # Find session by pin
     session = service.get_session_by_pin(body.pin)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Mock user
-    user = service.get_last_user()
+    # Get current user from session cookie
+    user = None
+    if current_user_id:
+        user = service.get_user(current_user_id)
     if not user:
-        user = service.create_user("Participant", None)
+        # Fallback for unauthenticated users
+        user = service.get_last_user()
+        if not user:
+            user = service.create_user("Participant", None)
     
     updated_session = service.join_session(session.id, user)
     return updated_session
@@ -129,15 +165,25 @@ def get_messages(id: str, service: DatabaseService = Depends(get_service)):
 
 
 @router.post("/{id}/messages", response_model=ChatMessage, status_code=201)
-def send_message(id: str, body: ChatMessageCreate, service: DatabaseService = Depends(get_service)):
+def send_message(
+    id: str,
+    body: ChatMessageCreate,
+    current_user_id: Optional[str] = Depends(get_current_user_id),
+    service: DatabaseService = Depends(get_service)
+):
     session = service.get_session(id)
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
     
-    # Mock user
-    user = service.get_first_user()
+    # Get current user from session cookie
+    user = None
+    if current_user_id:
+        user = service.get_user(current_user_id)
     if not user:
-        user = service.create_user("User", None)
+        # Fallback for unauthenticated users
+        user = service.get_first_user()
+        if not user:
+            user = service.create_user("User", None)
     
     msg = service.add_message(id, user.id, user.username, body.message)
     return msg
