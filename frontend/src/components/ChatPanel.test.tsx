@@ -67,7 +67,7 @@ describe('ChatPanel', () => {
       />
     );
 
-    const input = screen.getByPlaceholderText(/type a message/i);
+    const input = screen.getByPlaceholderText(/Type @AI for help/i);
     await user.type(input, 'New message');
     await user.keyboard('{Enter}');
 
@@ -86,7 +86,7 @@ describe('ChatPanel', () => {
       />
     );
 
-    const input = screen.getByPlaceholderText(/type a message/i) as HTMLInputElement;
+    const input = screen.getByPlaceholderText(/Type @AI for help/i) as HTMLInputElement;
     await user.type(input, 'Test message');
     await user.keyboard('{Enter}');
 
