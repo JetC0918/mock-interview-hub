@@ -30,7 +30,9 @@ def test_auth_workflow(client: TestClient):
     assert guest["username"] == "GuestUser"
 
 def test_session_workflow(client: TestClient):
-    # Determine Host (ensure one exists first, we just signed up one)
+    # Log in first
+    login_data = {"email": "host@example.com", "password": "password"}
+    client.post("/auth/login", json=login_data)
     
     # Create Session
     session_data = {"title": "Test Session", "language": "python"}
@@ -69,6 +71,6 @@ def test_execution(client: TestClient):
     # Run Code
     code_data = {"code": "print('hello')", "language": "python"}
     response = client.post("/execution/run", json=code_data)
-    assert response.status_code == 200
-    result = response.json()
-    assert result["stdout"] == "hello\n"
+    # Server-side execution is disabled, expect 503
+    assert response.status_code == 503
+    assert "disabled" in response.json()["detail"].lower()

@@ -41,15 +41,15 @@ def login(
     result = service.get_user_by_email_with_hash(user_in.email)
     if not result:
         raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found"
         )
     
     user, password_hash = result
     if not password_hash or not service.verify_password(user_in.password, password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Invalid credentials"
+            detail="Incorrect password"
         )
     
     set_secure_cookie(response, user.id)
