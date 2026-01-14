@@ -26,9 +26,8 @@ import type { SupportedLanguage as ApiSupportedLanguage } from './api-client/mod
 import type { CursorPosition as ApiCursorPosition } from './api-client/models/CursorPosition';
 
 // Configure API Client
-// Use relative /api path - works with both Vite dev proxy and nginx production proxy
-OpenAPI.BASE = '/api';
-OpenAPI.WITH_CREDENTIALS = true;
+// Configuration moved to main.tsx to ensure it runs before any requests
+
 
 // --- Frontend Internal Types (matching original mock structure) ---
 

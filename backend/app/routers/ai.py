@@ -3,8 +3,8 @@ AI Assistant Router
 
 Provides endpoints for AI-powered coding guidance.
 """
-
-from fastapi import APIRouter, HTTPException
+import os
+from fastapi import APIRouter, HTTPException, Request, Depends, Cookie
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime, UTC
@@ -12,8 +12,10 @@ import uuid
 
 from ..services.ai_service import get_ai_service
 
-
 router = APIRouter(prefix="/ai", tags=["AI Assistant"])
+
+# Cookie name for auth check
+COOKIE_NAME = "user_id"
 
 
 class AIAssistRequest(BaseModel):
@@ -33,18 +35,27 @@ class AIAssistResponse(BaseModel):
 
 
 @router.post("/assist", response_model=AIAssistResponse)
-async def get_ai_assistance(request: AIAssistRequest):
+async def get_ai_assistance(
+    request: AIAssistRequest,
+    user_id: Optional[str] = Cookie(None, alias=COOKIE_NAME)
+):
     """
     Get AI-powered guidance for a coding question.
-    
-    The AI will provide hints and guidance without giving direct code solutions.
+    Requires authentication.
     """
+    # Require authentication to use AI features
+    if not user_id:
+        raise HTTPException(
+            status_code=401,
+            detail="Authentication required to use AI features"
+        )
+    
     try:
         ai_service = get_ai_service()
     except ValueError as e:
         raise HTTPException(
             status_code=503, 
-            detail="AI service is not configured. Please set the GEMINI_API_KEY environment variable."
+            detail="AI service is temporarily unavailable"
         )
     
     # Remove @AI tag from message if present
