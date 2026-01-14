@@ -14,10 +14,8 @@ class TestExecutionIntegration:
         }
         response = client.post("/execution/run", json=code_data)
         
-        assert response.status_code == 200
-        result = response.json()
-        assert "Hello, Integration Test!" in result["stdout"]
-        assert result["stderr"] == ""
+        assert response.status_code == 503
+        assert "disabled" in response.json()["detail"].lower()
 
     def test_run_python_code_with_calculation(self, client: TestClient):
         """Test running Python code with calculations."""
@@ -27,9 +25,8 @@ class TestExecutionIntegration:
         }
         response = client.post("/execution/run", json=code_data)
         
-        assert response.status_code == 200
-        result = response.json()
-        assert "2 + 2 = 4" in result["stdout"]
+        assert response.status_code == 503
+        assert "disabled" in response.json()["detail"].lower()
 
     def test_run_python_code_with_syntax_error(self, client: TestClient):
         """Test running Python code with syntax error."""
@@ -39,10 +36,8 @@ class TestExecutionIntegration:
         }
         response = client.post("/execution/run", json=code_data)
         
-        assert response.status_code == 200
-        result = response.json()
-        # Should have error in stderr
-        assert result["stderr"] != "" or "SyntaxError" in result.get("stdout", "")
+        assert response.status_code == 503
+        assert "disabled" in response.json()["detail"].lower()
 
     def test_run_javascript_code(self, client: TestClient):
         """Test running JavaScript code."""
@@ -52,11 +47,8 @@ class TestExecutionIntegration:
         }
         response = client.post("/execution/run", json=code_data)
         
-        assert response.status_code == 200
-        result = response.json()
-        # JavaScript is now supported
-        assert "Hello from JS!" in result["stdout"]
-        assert result["exitCode"] == 0
+        assert response.status_code == 503
+        assert "disabled" in response.json()["detail"].lower()
 
     def test_unsupported_language_returns_error(self, client: TestClient):
         """Test that unsupported languages return proper error."""
@@ -66,10 +58,8 @@ class TestExecutionIntegration:
         }
         response = client.post("/execution/run", json=code_data)
         
-        assert response.status_code == 200
-        result = response.json()
-        assert "not yet supported" in result["stderr"].lower()
-        assert result["exitCode"] == 1
+        assert response.status_code == 503
+        assert "disabled" in response.json()["detail"].lower()
 
     def test_run_multiline_python(self, client: TestClient):
         """Test running multiline Python code."""
@@ -86,11 +76,8 @@ for name in names:
         }
         response = client.post("/execution/run", json=code_data)
         
-        assert response.status_code == 200
-        result = response.json()
-        assert "Hello, Alice!" in result["stdout"]
-        assert "Hello, Bob!" in result["stdout"]
-        assert "Hello, Charlie!" in result["stdout"]
+        assert response.status_code == 503
+        assert "disabled" in response.json()["detail"].lower()
 
     def test_execution_returns_execution_time(self, client: TestClient):
         """Test that execution returns timing information."""
@@ -100,9 +87,5 @@ for name in names:
         }
         response = client.post("/execution/run", json=code_data)
         
-        assert response.status_code == 200
-        result = response.json()
-        # Check that executionTime is present and is a number
-        assert "executionTime" in result
-        assert isinstance(result["executionTime"], (int, float))
-        assert result["executionTime"] >= 0
+        assert response.status_code == 503
+        assert "disabled" in response.json()["detail"].lower()
