@@ -275,6 +275,9 @@ class TestSessionIntegration:
         assert msg_response.status_code == 201
         
         # End session
+        # Re-login as host to end session
+        client.post("/auth/login", json={"email": "workflowhost@example.com", "password": "pass"})
+        
         end_response = client.post(f"/sessions/{session_id}/end")
         assert end_response.status_code == 200
         

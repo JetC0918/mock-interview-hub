@@ -4,7 +4,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.services.ai_service import AIAssistantService
 
-client = TestClient(app)
+# client = TestClient(app)  # Removed global client, using fixture instead
 
 @pytest.fixture
 def mock_ai_service():
@@ -14,7 +14,10 @@ def mock_ai_service():
         mock_get.return_value = service_mock
         yield service_mock
 
-def test_ai_assist_endpoint_success(mock_ai_service):
+def test_ai_assist_endpoint_success(client: TestClient, mock_ai_service):
+    # Authenticate
+    client.post("/auth/signup", json={"username": "ai_user", "email": "ai@example.com", "password": "password"})
+    
     response = client.post(
         "/ai/assist",
         json={
@@ -40,7 +43,10 @@ def test_ai_assist_endpoint_success(mock_ai_service):
     assert call_args.kwargs["user_message"] == "How do I solve this?"
     assert call_args.kwargs["problem_context"]["title"] == "Two Sum"
 
-def test_ai_assist_missing_message(mock_ai_service):
+def test_ai_assist_missing_message(client: TestClient, mock_ai_service):
+    # Authenticate
+    client.post("/auth/signup", json={"username": "ai_user_2", "email": "ai2@example.com", "password": "password"})
+    
     response = client.post(
         "/ai/assist",
         json={
@@ -52,7 +58,10 @@ def test_ai_assist_missing_message(mock_ai_service):
     # Should return 400 because message is empty after stripping tag
     assert response.status_code == 400
 
-def test_ai_assist_no_tag(mock_ai_service):
+def test_ai_assist_no_tag(client: TestClient, mock_ai_service):
+    # Authenticate
+    client.post("/auth/signup", json={"username": "ai_user_3", "email": "ai3@example.com", "password": "password"})
+    
     # Even without tag, if the frontend sends it to this endpoint, it should work
     # The endpoint strips @AI but does not strictly enforce its presence
     # BUT if stripping results in empty string, it fails.
@@ -69,7 +78,10 @@ def test_ai_assist_no_tag(mock_ai_service):
     data = response.json()
     assert data["message"] == "This is a mocked AI response."
 
-def test_ai_service_not_configured():
+def test_ai_service_not_configured(client: TestClient):
+    # Authenticate
+    client.post("/auth/signup", json={"username": "ai_user_4", "email": "ai4@example.com", "password": "password"})
+    
     with patch("app.routers.ai.get_ai_service", side_effect=ValueError("GEMINI_API_KEY environment variable is not set")):
         response = client.post(
             "/ai/assist",
@@ -80,4 +92,4 @@ def test_ai_service_not_configured():
         )
         
         assert response.status_code == 503
-        assert "AI service is not configured" in response.json()["detail"]
+        assert "AI service is temporarily unavailable" in response.json()["detail"]

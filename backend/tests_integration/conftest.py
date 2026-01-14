@@ -20,8 +20,12 @@ def test_engine():
     yield engine
     engine.dispose()
     # Cleanup: remove the test database file
-    if os.path.exists(TEST_DB_PATH):
-        os.remove(TEST_DB_PATH)
+    # Note: On Windows, this may fail if the file is still locked
+    try:
+        if os.path.exists(TEST_DB_PATH):
+            os.remove(TEST_DB_PATH)
+    except PermissionError:
+        pass
 
 
 @pytest.fixture(scope="session")
