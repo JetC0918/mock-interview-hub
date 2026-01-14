@@ -1,9 +1,11 @@
+import os
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())  # Load .env from project root
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+
 from .routers import auth, sessions, execution, ai
 from .database.config import init_db, SessionLocal
 from .database.service import seed_database
@@ -13,12 +15,14 @@ from .database.service import seed_database
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
     init_db()
-    # Seed with initial data
-    db = SessionLocal()
-    try:
-        seed_database(db)
-    finally:
-        db.close()
+    
+    # Only seed if not explicitly disabled (for production)
+    if os.environ.get("DISABLE_SEED", "").lower() != "true":
+        db = SessionLocal()
+        try:
+            seed_database(db)
+        finally:
+            db.close()
     yield
 
 
@@ -29,20 +33,30 @@ app = FastAPI(
     lifespan=lifespan
 )
 
-# CORS (Allow all for development)
-# Logging Middleware
-from fastapi import Request
-@app.middleware("http")
-async def log_requests(request: Request, call_next):
-    print(f"DEBUG LOG: Incoming Request path: {request.url.path}")
-    response = await call_next(request)
-    print(f"DEBUG LOG: Response status: {response.status_code}")
-    return response
+# CORS Configuration
+# Get allowed origins from environment or use defaults for development
+frontend_url = os.environ.get("FRONTEND_URL", "")
+allowed_origins = [
+    "http://localhost:8080",
+    "http://localhost:8081", 
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:8081",
+    "http://localhost:80",
+    "http://localhost:5173",  # Vite dev server
+]
+
+# Add production frontend URL if configured
+if frontend_url:
+    allowed_origins.append(frontend_url)
+
+# Add Render URLs (common patterns)
+render_frontend = os.environ.get("RENDER_EXTERNAL_URL", "")
+if render_frontend:
+    allowed_origins.append(render_frontend)
 
 app.add_middleware(
     CORSMiddleware,
-    # Allow localhost for development, and all origins for production (behind nginx proxy)
-    allow_origins=["http://localhost:8080", "http://localhost:8081", "http://127.0.0.1:8080", "http://127.0.0.1:8081", "http://localhost:80"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -53,6 +67,7 @@ app.include_router(auth.router)
 app.include_router(sessions.router)
 app.include_router(execution.router)
 app.include_router(ai.router)
+
 
 @app.get("/")
 def read_root():

@@ -371,39 +371,47 @@ class DatabaseService:
 
 
 def seed_database(db: DBSession):
-    """Seed the database with initial data."""
+    """Seed the database with initial data (development only)."""
+    import secrets
+    import os
+    
     service = DatabaseService(db)
     
     # Check if already seeded
     if service.get_user_count() > 0:
         return
     
-    # Create users
+    # Generate random passwords for dev users (only used in development)
+    def generate_dev_password():
+        return secrets.token_urlsafe(16)
+    
+    # Create demo users with random passwords
+    # Note: These are for development only and have random passwords
     host = service.create_user(
         username="CodeMaster",
         email="host@example.com",
-        password="password",
+        password=generate_dev_password(),  # Random password
         role=Role.HOST
     )
     
     participant = service.create_user(
         username="Pythonista",
         email="dev@example.com",
-        password="password",
+        password=generate_dev_password(),  # Random password
         role=Role.PARTICIPANT
     )
     
     service.create_user(
         username="AlgoGuru",
         email="algo@example.com",
-        password="password",
+        password=generate_dev_password(),  # Random password
         role=Role.PARTICIPANT
     )
     
     service.create_user(
         username="FrontEndFan",
         email="frontend@example.com",
-        password="password",
+        password=generate_dev_password(),  # Random password
         role=Role.SPECTATOR
     )
     

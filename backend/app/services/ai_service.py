@@ -86,7 +86,11 @@ Remember: Your goal is to help them LEARN, not to solve it for them."""
             response = self.model.generate_content(full_prompt)
             return response.text.strip()
         except Exception as e:
-            return f"I'm having trouble connecting right now. Please try again in a moment. (Error: {str(e)[:50]})"
+            # Log the full error server-side for debugging
+            import logging
+            logging.error(f"AI service error: {str(e)}")
+            # Return generic message to user (don't expose internal details)
+            return "I'm having trouble connecting right now. Please try again in a moment."
 
 
 # Singleton instance (lazy initialization)
