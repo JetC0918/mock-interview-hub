@@ -228,8 +228,36 @@ import types
 
 # Parse input
 input_str = """${testInput}"""
+
+def split_top_level_commas(s):
+    result = []
+    current = []
+    bracket_level = 0
+    in_quote = None
+    for char in s:
+        if char == in_quote:
+            in_quote = None
+        elif char in '"\\'' and in_quote is None:
+            in_quote = char
+        elif in_quote is None:
+            if char in '([{':
+                bracket_level += 1
+            elif char in ')]}':
+                bracket_level -= 1
+            elif char == ',' and bracket_level == 0:
+                result.append("".join(current).strip())
+                current = []
+                continue
+        current.append(char)
+    if current:
+        result.append("".join(current).strip())
+    return result
+
 local_vars = {}
-exec(input_str, {}, local_vars)
+assignments = split_top_level_commas(input_str)
+for assignment in assignments:
+    if assignment:
+        exec(assignment, {}, local_vars)
 
 # Find the main function
 func = None
@@ -284,14 +312,46 @@ async function executeJavaScriptWithInput(code: string, testInput: string): Prom
 
         // Parse test input to extract variables
         const vars: Record<string, any> = {};
-        const assignments = testInput.split(',').map(s => s.trim());
+
+        const splitTopLevelCommas = (s: string) => {
+            const result: string[] = [];
+            let current = '';
+            let bracketLevel = 0;
+            let inQuote: string | null = null;
+            for (let i = 0; i < s.length; i++) {
+                const char = s[i];
+                if (char === inQuote) {
+                    inQuote = null;
+                } else if ((char === '"' || char === "'" || char === '`') && inQuote === null) {
+                    inQuote = char;
+                } else if (inQuote === null) {
+                    if (char === '(' || char === '[' || char === '{') {
+                        bracketLevel++;
+                    } else if (char === ')' || char === ']' || char === '}') {
+                        bracketLevel--;
+                    } else if (char === ',' && bracketLevel === 0) {
+                        result.push(current.trim());
+                        current = '';
+                        continue;
+                    }
+                }
+                current += char;
+            }
+            if (current) {
+                result.push(current.trim());
+            }
+            return result;
+        };
+
+        const assignments = splitTopLevelCommas(testInput);
 
         for (const assignment of assignments) {
-            const match = assignment.match(/^(\w+)\s*=\s*(.+)$/);
+            const match = assignment.match(/^(\w+)\s*=\s*(.+)$/s);
             if (match) {
                 const [, name, value] = match;
                 try {
-                    vars[name] = eval(value);
+                    // Try to eval as JSON/Object if possible
+                    vars[name] = eval(`(${value})`);
                 } catch {
                     vars[name] = value;
                 }
@@ -309,17 +369,21 @@ async function executeJavaScriptWithInput(code: string, testInput: string): Prom
         let func = null;
         
         for (const name of funcNames) {
-          if (typeof eval(name) === 'function') {
-            func = eval(name);
-            break;
-          }
+          try {
+            if (typeof eval(name) === 'function') {
+                func = eval(name);
+                break;
+            }
+          } catch(e) {}
         }
         
         // Try to find any function defined in the code
         if (!func) {
           const match = ${JSON.stringify(code)}.match(/function\\s+(\\w+)/);
           if (match) {
-            func = eval(match[1]);
+            try {
+                func = eval(match[1]);
+            } catch(e) {}
           }
         }
         
