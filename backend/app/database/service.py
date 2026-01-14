@@ -381,37 +381,32 @@ def seed_database(db: DBSession):
     if service.get_user_count() > 0:
         return
     
-    # Generate random passwords for dev users (only used in development)
-    def generate_dev_password():
-        return secrets.token_urlsafe(16)
-    
-    # Create demo users with random passwords
-    # Note: These are for development only and have random passwords
+    # Create demo users with deterministic passwords for tests
     host = service.create_user(
         username="CodeMaster",
         email="host@example.com",
-        password=generate_dev_password(),  # Random password
+        password="password",
         role=Role.HOST
     )
     
     participant = service.create_user(
         username="Pythonista",
         email="dev@example.com",
-        password=generate_dev_password(),  # Random password
+        password="password",
         role=Role.PARTICIPANT
     )
     
     service.create_user(
         username="AlgoGuru",
         email="algo@example.com",
-        password=generate_dev_password(),  # Random password
+        password="password",
         role=Role.PARTICIPANT
     )
     
     service.create_user(
         username="FrontEndFan",
         email="frontend@example.com",
-        password=generate_dev_password(),  # Random password
+        password="password",
         role=Role.SPECTATOR
     )
     
