@@ -82,10 +82,35 @@ try:
     # Parse input
     input_str = """{test_input}"""
     
-    # Try to execute the input as Python code to get the actual values
-    # e.g., "nums = [2,7,11,15], target = 9" -> nums=[2,7,11,15], target=9
+    def split_top_level_commas(s):
+        result = []
+        current = []
+        bracket_level = 0
+        in_quote = None
+        for char in s:
+            if char == in_quote:
+                in_quote = None
+            elif char in '"\\'' and in_quote is None:
+                in_quote = char
+            elif in_quote is None:
+                if char in '([{':
+                    bracket_level += 1
+                elif char in ')]}':
+                    bracket_level -= 1
+                elif char == ',' and bracket_level == 0:
+                    result.append("".join(current).strip())
+                    current = []
+                    continue
+            current.append(char)
+        if current:
+            result.append("".join(current).strip())
+        return result
+
     local_vars = {{}}
-    exec(input_str, {{}}, local_vars)
+    assignments = split_top_level_commas(input_str)
+    for assignment in assignments:
+        if assignment:
+            exec(assignment, {{}}, local_vars)
     
     # Find the main function (first defined function)
     import types
@@ -186,17 +211,45 @@ try {{
     // Parse input string
     const inputStr = `{test_input}`;
     
-    // Extract variable assignments from the input
-    // e.g., "nums = [2,7,11,15], target = 9" -> nums=[2,7,11,15], target=9
+    function splitTopLevelCommas(s) {{
+        const result = [];
+        let current = '';
+        let bracketLevel = 0;
+        let inQuote = null;
+        for (let i = 0; i < s.length; i++) {{
+            const char = s[i];
+            if (char === inQuote) {{
+                inQuote = null;
+            }} else if ((char === '"' || char === "'" || char === '`') && inQuote === null) {{
+                inQuote = char;
+            }} else if (inQuote === null) {{
+                if (char === '(' || char === '[' || char === '{{') {{
+                    bracketLevel++;
+                }} else if (char === ')' || char === ']' || char === '}}') {{
+                    bracketLevel--;
+                }} else if (char === ',' && bracketLevel === 0) {{
+                    result.push(current.trim());
+                    current = '';
+                    continue;
+                }}
+            }}
+            current += char;
+        }}
+        if (current) {{
+            result.push(current.trim());
+        }}
+        return result;
+    }}
+
     const vars = {{}};
-    const assignments = inputStr.split(',').map(s => s.trim());
+    const assignments = splitTopLevelCommas(inputStr);
     
     for (const assignment of assignments) {{
-        const match = assignment.match(/^(\\w+)\\s*=\\s*(.+)$/);
+        const match = assignment.match(/^(\\w+)\\s*=\\s*(.+)$/s);
         if (match) {{
             const [, name, value] = match;
             try {{
-                vars[name] = eval(value);
+                vars[name] = eval("(" + value + ")");
             }} catch (e) {{
                 vars[name] = value;
             }}
@@ -205,25 +258,30 @@ try {{
     
     // Find the main function (first defined function in the code)
     // Look for common function patterns
-    const funcNames = Object.keys(this).filter(k => typeof this[k] === 'function');
+    let func = null;
     
     // Try common LeetCode-style function names first
     const commonNames = ['solution', 'twoSum', 'two_sum', 'solve', 'main'];
-    let func = null;
     
     for (const name of commonNames) {{
-        if (typeof global[name] === 'function') {{
-            func = global[name];
-            break;
-        }}
+        try {{
+            if (typeof global[name] === 'function') {{
+                func = global[name];
+                break;
+            }}
+        }} catch(e) {{}}
     }}
     
     // If no common name found, try to find any user-defined function
     if (!func) {{
         // Look for function defined in global scope
         const match = `{code}`.match(/function\\s+(\\w+)/);
-        if (match && typeof global[match[1]] === 'function') {{
-            func = global[match[1]];
+        if (match) {{
+            try {{
+                if (typeof global[match[1]] === 'function') {{
+                    func = global[match[1]];
+                }}
+            }} catch(e) {{}}
         }}
     }}
     
