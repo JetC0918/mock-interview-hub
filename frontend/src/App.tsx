@@ -11,6 +11,7 @@ import LobbyPage from "./pages/LobbyPage";
 import SessionPage from "./pages/SessionPage";
 
 import SpectatePage from "./pages/SpectatePage";
+import LiveSessionPage from "./pages/LiveSessionPage";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/session/:sessionId" element={<SessionPage />} />
 
             <Route path="/spectate" element={<SpectatePage />} />
+            <Route path="/spectate/:sessionId" element={<LiveSessionPage />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

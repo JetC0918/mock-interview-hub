@@ -82,7 +82,7 @@ def test_ai_service_not_configured(client: TestClient):
     # Authenticate
     client.post("/auth/signup", json={"username": "ai_user_4", "email": "ai4@example.com", "password": "password"})
     
-    with patch("app.routers.ai.get_ai_service", side_effect=ValueError("GEMINI_API_KEY environment variable is not set")):
+    with patch("app.routers.ai.get_ai_service", side_effect=ValueError("DEEPSEEK_API_KEY environment variable is not set")):
         response = client.post(
             "/ai/assist",
             json={

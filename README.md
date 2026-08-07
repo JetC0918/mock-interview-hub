@@ -24,7 +24,7 @@ A real-time collaborative coding interview platform where interviewers and candi
 | **Frontend** | React, TypeScript, Vite, TailwindCSS, shadcn/ui, Monaco Editor |
 | **Backend** | FastAPI, SQLAlchemy, bcrypt, Pydantic |
 | **Database** | SQLite (dev) / PostgreSQL (prod) |
-| **AI** | Google Gemini API |
+| **AI** | DeepSeek V4 Flash API |
 | **Package Managers** | npm (frontend), uv (backend) |
 
 ## Quick Start
@@ -53,7 +53,7 @@ npm install              # Install frontend dependencies
 
 Create a `.env` file in the project root:
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
 ```
 
 ### 4. Run Development Servers

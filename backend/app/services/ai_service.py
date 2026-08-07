@@ -1,17 +1,21 @@
 """
-AI Assistant Service using Google Gemini 2.5 Flash
+AI Assistant Service using DeepSeek V4 Flash
 
 This service provides AI-powered guidance to help users think through
 coding problems without giving direct solutions.
 """
 
 import os
+import logging
 from typing import Optional
-import google.generativeai as genai
+import httpx
 
 
 class AIAssistantService:
-    """Service for AI-powered coding guidance using Gemini 2.5 Flash."""
+    """Service for AI-powered coding guidance using DeepSeek V4 Flash."""
+
+    API_URL = "https://api.deepseek.com/chat/completions"
+    MODEL_NAME = "deepseek-v4-flash"
 
     SYSTEM_PROMPT = """You are a friendly and supportive coding mentor in a mock interview practice session. 
 Your role is to GUIDE users in thinking through problems, NOT to give them code or direct solutions.
@@ -33,15 +37,11 @@ Remember: Your goal is to help them LEARN, not to solve it for them."""
 
     def __init__(self):
         """Initialize the AI service with API key from environment."""
-        api_key = os.environ.get("GEMINI_API_KEY")
+        api_key = os.environ.get("DEEPSEEK_API_KEY")
         if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable is not set")
+            raise ValueError("DEEPSEEK_API_KEY environment variable is not set")
         
-        genai.configure(api_key=api_key)
-        self.model = genai.GenerativeModel(
-            model_name="gemini-2.5-flash",
-            system_instruction=self.SYSTEM_PROMPT
-        )
+        self.api_key = api_key
 
     def get_guidance(
         self, 
@@ -83,13 +83,31 @@ Remember: Your goal is to help them LEARN, not to solve it for them."""
         full_prompt = "".join(prompt_parts)
         
         try:
-            response = self.model.generate_content(full_prompt)
-            return response.text.strip()
-        except Exception as e:
-            # Log the full error server-side for debugging
-            import logging
-            logging.error(f"AI service error: {str(e)}")
-            # Return generic message to user (don't expose internal details)
+            response = httpx.post(
+                self.API_URL,
+                headers={
+                    "Authorization": f"Bearer {self.api_key}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": self.MODEL_NAME,
+                    "messages": [
+                        {"role": "system", "content": self.SYSTEM_PROMPT},
+                        {"role": "user", "content": full_prompt},
+                    ],
+                    "thinking": {"type": "disabled"},
+                    "stream": False,
+                },
+                timeout=30.0,
+            )
+            response.raise_for_status()
+            content = response.json()["choices"][0]["message"]["content"]
+            if not isinstance(content, str) or not content.strip():
+                raise ValueError("DeepSeek returned an empty response")
+            return content.strip()
+        except Exception as error:
+            # Never log request headers, response bodies, or API key values.
+            logging.error("DeepSeek AI request failed (%s)", type(error).__name__)
             return "I'm having trouble connecting right now. Please try again in a moment."
 
 

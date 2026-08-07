@@ -75,19 +75,3 @@ jobs:
       
       - name: Run tests
         run: npm test -- --run
-
-  # Uncomment this job to enable Render deployment
-  # You'll need to add these GitHub secrets:
-  #   - RENDER_DEPLOY_HOOK_URL (backend deploy hook)
-  #   - RENDER_FRONTEND_DEPLOY_HOOK_URL (frontend deploy hook)
-  #
-  # deploy:
-  #   name: Deploy to Render
-  #   needs: [test-backend, test-backend-integration, test-frontend]
-  #   runs-on: ubuntu-latest
-  #   if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-  #   steps:
-  #     - name: Deploy Backend to Render
-  #       run: curl -X POST "${{ secrets.RENDER_DEPLOY_HOOK_URL }}"
-  #     - name: Deploy Frontend to Render
-  #       run: curl -X POST "${{ secrets.RENDER_FRONTEND_DEPLOY_HOOK_URL }}"

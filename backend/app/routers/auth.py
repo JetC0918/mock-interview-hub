@@ -20,7 +20,7 @@ def get_service(db: DBSession = Depends(get_db)) -> DatabaseService:
 
 def set_secure_cookie(response: Response, user_id: str):
     """Set a secure session cookie."""
-    is_production = os.environ.get("RENDER", "") != ""
+    is_production = os.environ.get("COOKIE_SECURE", "false").lower() == "true"
     response.set_cookie(
         key=COOKIE_NAME,
         value=user_id,

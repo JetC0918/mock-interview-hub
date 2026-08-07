@@ -49,11 +49,6 @@ allowed_origins = [
 if frontend_url:
     allowed_origins.append(frontend_url)
 
-# Add Render URLs (common patterns)
-render_frontend = os.environ.get("RENDER_EXTERNAL_URL", "")
-if render_frontend:
-    allowed_origins.append(render_frontend)
-
 app.add_middleware(
     CORSMiddleware,
     allow_origins=allowed_origins,
@@ -76,5 +71,5 @@ def read_root():
 
 @app.get("/health")
 def health_check():
-    """Health check endpoint for Render and load balancers."""
+    """Health check endpoint for load balancers and container orchestration."""
     return {"status": "healthy"}

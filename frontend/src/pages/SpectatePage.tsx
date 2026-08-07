@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Eye, Users, Code2, Clock, Play, Loader2 } from 'lucide-react';
+import { demoLiveSessions } from '@/data/liveSessions';
 
 const SpectatePage: React.FC = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
@@ -24,58 +25,11 @@ const SpectatePage: React.FC = () => {
   const loadSessions = async () => {
     try {
       const activeSessions = await api.spectator.getSessions();
-      // Add mock active sessions for demo
-      const mockSessions: Session[] = [
-        {
-          id: 'live-1',
-          pin: '789456',
-          hostId: 'host-1',
-          title: 'Senior Frontend Interview',
-          description: '',
-          language: 'typescript',
-          participants: [
-            { id: 'p1', username: 'interviewer_jane', role: 'host', color: 'hsl(174 72% 50%)', joinedAt: new Date() },
-            { id: 'p2', username: 'candidate_mike', role: 'participant', color: 'hsl(265 70% 60%)', joinedAt: new Date() },
-          ],
-          code: '',
-          status: 'active',
-          createdAt: new Date(Date.now() - 1800000),
-        },
-        {
-          id: 'live-2',
-          pin: '321654',
-          hostId: 'host-2',
-          title: 'Algorithm Challenge',
-          description: '',
-          language: 'python',
-          participants: [
-            { id: 'p3', username: 'coach_sara', role: 'host', color: 'hsl(174 72% 50%)', joinedAt: new Date() },
-            { id: 'p4', username: 'student_alex', role: 'participant', color: 'hsl(38 92% 50%)', joinedAt: new Date() },
-            { id: 'p5', username: 'student_emma', role: 'participant', color: 'hsl(330 80% 60%)', joinedAt: new Date() },
-          ],
-          code: '',
-          status: 'active',
-          createdAt: new Date(Date.now() - 2700000),
-        },
-        {
-          id: 'live-3',
-          pin: '654987',
-          hostId: 'host-3',
-          title: 'Bootcamp Live Session',
-          description: '',
-          language: 'javascript',
-          participants: [
-            { id: 'p6', username: 'instructor', role: 'host', color: 'hsl(174 72% 50%)', joinedAt: new Date() },
-            { id: 'p7', username: 'student_1', role: 'participant', color: 'hsl(265 70% 60%)', joinedAt: new Date() },
-            { id: 'p8', username: 'student_2', role: 'participant', color: 'hsl(38 92% 50%)', joinedAt: new Date() },
-            { id: 'p9', username: 'student_3', role: 'participant', color: 'hsl(330 80% 60%)', joinedAt: new Date() },
-          ],
-          code: '',
-          status: 'active',
-          createdAt: new Date(Date.now() - 900000),
-        },
-      ];
-      setSessions([...activeSessions, ...mockSessions]);
+      const activeIds = new Set(activeSessions.map((session) => session.id));
+      setSessions([
+        ...activeSessions,
+        ...demoLiveSessions.filter((session) => !activeIds.has(session.id)),
+      ]);
     } catch (error) {
       console.error('Failed to load sessions:', error);
     } finally {
@@ -183,14 +137,14 @@ const SpectatePage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Eye className="h-4 w-4" />
-                      <span>{Math.floor(Math.random() * 50) + 5} watching</span>
+                      <span>{session.id === 'live-1' ? 24 : session.id === 'live-2' ? 17 : 31} watching</span>
                     </div>
                   </div>
 
                   <Button
                     className="w-full mt-4 opacity-0 group-hover:opacity-100 transition-opacity"
                     variant="hero"
-                    onClick={() => navigate(`/session/${session.id}`)}
+                    onClick={() => navigate(`/spectate/${session.id}`)}
                   >
                     <Play className="h-4 w-4 mr-2" />
                     Watch Session
