@@ -74,7 +74,7 @@ const Header: React.FC = () => {
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild className="md:hidden">
-              <Button variant="ghost" size="icon">
+              <Button variant="ghost" size="icon" aria-label="Open navigation menu">
                 <Menu className="h-5 w-5" />
               </Button>
             </DropdownMenuTrigger>

@@ -8,9 +8,10 @@ import { Send, Bot, Loader2 } from 'lucide-react';
 interface ChatPanelProps {
   messages: ChatMessage[];
   participants: Participant[];
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string) => Promise<void>;
   currentUserId: string;
   isAILoading?: boolean;
+  disabled?: boolean;
 }
 
 const ChatPanel: React.FC<ChatPanelProps> = ({
@@ -19,6 +20,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
   onSendMessage,
   currentUserId,
   isAILoading = false,
+  disabled = false,
 }) => {
   const [newMessage, setNewMessage] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -29,11 +31,15 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     }
   }, [messages, isAILoading]);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMessage.trim()) {
-      onSendMessage(newMessage.trim());
-      setNewMessage('');
+    if (newMessage.trim() && !disabled) {
+      try {
+        await onSendMessage(newMessage.trim());
+        setNewMessage('');
+      } catch {
+        // Keep the draft visible when the server rejects the send.
+      }
     }
   };
 
@@ -120,8 +126,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
           onChange={(e) => setNewMessage(e.target.value)}
           placeholder="Type @AI for help..."
           className="flex-1"
+          disabled={disabled}
         />
-        <Button type="submit" size="icon" disabled={!newMessage.trim() || isAILoading}>
+        <Button type="submit" size="icon" disabled={!newMessage.trim() || isAILoading || disabled}>
           <Send className="h-4 w-4" />
         </Button>
       </form>

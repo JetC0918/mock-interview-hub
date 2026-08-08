@@ -29,6 +29,24 @@ def test_auth_workflow(client: TestClient):
     guest = response.json()
     assert guest["username"] == "GuestUser"
 
+
+def test_auth_cookie_is_opaque_and_revocable(client: TestClient):
+    response = client.post("/auth/login", json={"email": "algo@example.com", "password": "password"})
+    assert response.status_code == 200
+    token = response.cookies.get("session_token")
+    assert token
+    assert len(token) >= 40
+    assert token != response.json()["id"]
+
+    assert client.get("/auth/me").status_code == 200
+    client.post("/auth/logout")
+    assert client.get("/auth/me").status_code == 401
+
+
+def test_forged_identity_cookie_is_rejected(client: TestClient):
+    client.cookies.set("session_token", "known-user-id")
+    assert client.get("/auth/me").status_code == 401
+
 def test_session_workflow(client: TestClient):
     # Log in first
     login_data = {"email": "host@example.com", "password": "password"}
@@ -47,6 +65,8 @@ def test_session_workflow(client: TestClient):
     response = client.get(f"/sessions/{session_id}")
     assert response.status_code == 200
     assert response.json()["id"] == session_id
+    assert "pin" not in response.json()
+    assert "hostId" not in response.json()
 
     # Join Session
     # Need new user
@@ -66,6 +86,28 @@ def test_session_workflow(client: TestClient):
     assert response.status_code == 200
     assert len(response.json()) >= 1
     assert response.json()[0]["message"] == "Hello World"
+
+
+def test_ended_session_rejects_mutations(client: TestClient):
+    client.post("/auth/login", json={"email": "host@example.com", "password": "password"})
+    session = client.post("/sessions/", json={"title": "Ended", "language": "python"}).json()
+    session_id = session["id"]
+    assert client.post(f"/sessions/{session_id}/end").status_code == 200
+    assert client.put(f"/sessions/{session_id}/code", json={"code": "bad"}).status_code == 410
+    assert client.post("/sessions/join-by-pin", json={"pin": session["pin"]}).status_code == 410
+
+
+def test_host_can_rotate_join_secret(client: TestClient):
+    client.post("/auth/login", json={"email": "host@example.com", "password": "password"})
+    session = client.post("/sessions/", json={"title": "Rotate", "language": "python"}).json()
+    old_secret = session["pin"]
+
+    response = client.post(f"/sessions/{session['id']}/join-secret/rotate")
+
+    assert response.status_code == 200
+    new_secret = response.json()["pin"]
+    assert new_secret != old_secret
+    assert client.post("/sessions/join-by-pin", json={"pin": old_secret}).status_code == 404
 
 def test_execution(client: TestClient):
     # Run Code

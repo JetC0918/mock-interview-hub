@@ -2,7 +2,7 @@
 from datetime import datetime
 from sqlalchemy import (
     Column, String, Integer, Float, DateTime, Boolean, Text, 
-    Enum as SQLEnum, ForeignKey, Table
+    Enum as SQLEnum, ForeignKey, Table, UniqueConstraint
 )
 from sqlalchemy.orm import relationship
 from .config import Base
@@ -53,6 +53,21 @@ class UserModel(Base):
     hosted_sessions = relationship("SessionModel", back_populates="host")
     participations = relationship("ParticipantModel", back_populates="user")
     messages = relationship("ChatMessageModel", back_populates="user")
+    auth_sessions = relationship("AuthSessionModel", back_populates="user", cascade="all, delete-orphan")
+
+
+class AuthSessionModel(Base):
+    """Opaque, revocable server-side authentication session."""
+    __tablename__ = "auth_sessions"
+
+    id = Column(String, primary_key=True, index=True)
+    token_hash = Column(String, unique=True, nullable=False, index=True)
+    user_id = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    expires_at = Column(DateTime, nullable=False, index=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    revoked_at = Column(DateTime, nullable=True)
+
+    user = relationship("UserModel", back_populates="auth_sessions")
 
 
 # Problem Model
@@ -97,6 +112,10 @@ class SessionModel(Base):
     status = Column(SQLEnum(SessionStatusEnum), nullable=False)
     problem_id = Column(String, ForeignKey("problems.id"), nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
+    # Separate from session creation so rotating a join secret renews its TTL.
+    # Nullable keeps databases created before this column readable during the
+    # one-time startup migration.
+    join_secret_created_at = Column(DateTime, default=datetime.utcnow, nullable=True)
 
     # Relationships
     host = relationship("UserModel", back_populates="hosted_sessions")
@@ -108,6 +127,9 @@ class SessionModel(Base):
 # Participant (Session-User association with extra data)
 class ParticipantModel(Base):
     __tablename__ = "participants"
+    __table_args__ = (
+        UniqueConstraint("session_id", "user_id", name="uq_participants_session_user"),
+    )
 
     id = Column(Integer, primary_key=True, autoincrement=True)
     session_id = Column(String, ForeignKey("sessions.id"), nullable=False)

@@ -8,16 +8,31 @@ from contextlib import asynccontextmanager
 
 from .routers import auth, sessions, execution, ai
 from .database.config import init_db, SessionLocal
-from .database.service import seed_database
+from .database.service import DatabaseService, seed_database
+from .utils.rate_limit import limiter
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
     init_db()
-    
-    # Only seed if not explicitly disabled (for production)
-    if os.environ.get("DISABLE_SEED", "").lower() != "true":
+
+    app_env = os.environ.get("APP_ENV", "development").lower()
+    seed_demo_data = os.environ.get("SEED_DEMO_DATA", "").lower() == "true"
+    if app_env == "production":
+        if os.environ.get("COOKIE_SECURE", "").lower() != "true":
+            raise RuntimeError("COOKIE_SECURE=true is required in production")
+        if seed_demo_data:
+            raise RuntimeError("SEED_DEMO_DATA must be false in production")
+        db = SessionLocal()
+        try:
+            if DatabaseService(db).has_known_demo_accounts():
+                raise RuntimeError(
+                    "Known demo accounts exist in the production database; migrate or remove them before startup"
+                )
+        finally:
+            db.close()
+    elif seed_demo_data:
         db = SessionLocal()
         try:
             seed_database(db)

@@ -142,7 +142,7 @@ const SpectatePage: React.FC = () => {
                   </div>
 
                   <Button
-                    className="w-full mt-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="w-full mt-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity"
                     variant="hero"
                     onClick={() => navigate(`/spectate/${session.id}`)}
                   >

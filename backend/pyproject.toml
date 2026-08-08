@@ -12,7 +12,6 @@ dependencies = [
     "passlib[bcrypt]>=1.7.4",
     "psycopg2-binary>=2.9.11",
     "pydantic>=2.12.5",
-    "slowapi>=0.1.9",
     "sqlalchemy>=2.0.44",
     "uvicorn>=0.38.0",
 ]

@@ -85,7 +85,7 @@ class TestAuthIntegration:
         response = client.post("/auth/login", json=login_data)
         
         assert response.status_code == 401
-        assert "incorrect password" in response.json()["detail"].lower()
+        assert response.json()["detail"] == "Invalid email or password"
 
     def test_login_with_nonexistent_user(self, client: TestClient):
         """Test that login fails for non-existent user."""
@@ -95,8 +95,8 @@ class TestAuthIntegration:
         }
         response = client.post("/auth/login", json=login_data)
         
-        assert response.status_code == 404
-        assert "not found" in response.json()["detail"].lower()
+        assert response.status_code == 401
+        assert response.json()["detail"] == "Invalid email or password"
 
     def test_guest_login(self, client: TestClient):
         """Test that guest login creates a user without email."""

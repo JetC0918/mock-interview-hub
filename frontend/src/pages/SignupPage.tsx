@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Code2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 const SignupPage: React.FC = () => {
   const [username, setUsername] = useState('');
   const [email, setEmail] = useState('');
@@ -28,10 +31,10 @@ const SignupPage: React.FC = () => {
         description: 'Welcome to CodioLive.',
       });
       navigate('/lobby');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create account',
+        description: getErrorMessage(error, 'Failed to create account'),
         variant: 'destructive',
       });
     } finally {

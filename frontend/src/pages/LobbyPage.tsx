@@ -25,6 +25,9 @@ import {
 import { Plus, Link as LinkIcon, Hash, Users, Clock, Copy, Check, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 const LobbyPage: React.FC = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -71,14 +74,14 @@ const LobbyPage: React.FC = () => {
       const session = await api.sessions.create(newSessionTitle, newSessionLanguage);
       toast({
         title: 'Session created!',
-        description: `PIN: ${session.pin}`,
+        description: `Join secret: ${session.pin}`,
       });
       setCreateDialogOpen(false);
       navigate(`/session/${session.id}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to create session',
+        description: getErrorMessage(error, 'Failed to create session'),
         variant: 'destructive',
       });
     } finally {
@@ -90,7 +93,7 @@ const LobbyPage: React.FC = () => {
     if (!joinPin.trim()) {
       toast({
         title: 'Error',
-        description: 'Please enter a session PIN',
+        description: 'Please enter the session join secret',
         variant: 'destructive',
       });
       return;
@@ -104,10 +107,10 @@ const LobbyPage: React.FC = () => {
       });
       setJoinDialogOpen(false);
       navigate(`/session/${session.id}`);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to join session',
+        description: getErrorMessage(error, 'Failed to join session'),
         variant: 'destructive',
       });
     }
@@ -115,7 +118,7 @@ const LobbyPage: React.FC = () => {
 
   const copyShareLink = (session: Session) => {
     const link = api.utils.generateShareableLink(session.id);
-    navigator.clipboard.writeText(`${link} | PIN: ${session.pin}`);
+    navigator.clipboard.writeText(`${link} | Join secret: ${session.pin}`);
     setCopiedId(session.id);
     toast({
       title: 'Copied!',
@@ -162,27 +165,27 @@ const LobbyPage: React.FC = () => {
               <DialogTrigger asChild>
                 <Button variant="outline">
                   <Hash className="mr-2 h-4 w-4" />
-                  Join with PIN
+                  Join with secret
                 </Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader>
                   <DialogTitle>Join a Session</DialogTitle>
                   <DialogDescription>
-                    Enter the 6-digit PIN shared by the host
+                    Paste the join secret shared by the host
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4 pt-4">
                   <div className="space-y-2">
-                    <Label htmlFor="pin">Session PIN</Label>
+                    <Label htmlFor="pin">Session join secret</Label>
                     <Input
                       id="pin"
                       type="text"
-                      placeholder="123456"
+                      placeholder="Paste the secret"
                       value={joinPin}
-                      onChange={(e) => setJoinPin(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                      maxLength={6}
-                      className="text-center text-2xl tracking-widest font-mono"
+                      onChange={(e) => setJoinPin(e.target.value.slice(0, 128))}
+                      maxLength={128}
+                      className="text-center text-lg tracking-wide font-mono"
                     />
                   </div>
                   <Button onClick={handleJoinSession} className="w-full" variant="hero">

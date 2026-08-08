@@ -11,11 +11,11 @@ def test_login_success(client: TestClient):
 
 def test_login_user_not_found(client: TestClient):
     response = client.post("/auth/login", json={"email": "nonexistent@example.com", "password": "password"})
-    assert response.status_code == 404
-    assert response.json()["detail"] == "User not found"
+    assert response.status_code == 401
+    assert response.json()["detail"] == "Invalid email or password"
 
 
 def test_login_wrong_password(client: TestClient):
     response = client.post("/auth/login", json={"email": "algo@example.com", "password": "wrongpassword"})
     assert response.status_code == 401
-    assert response.json()["detail"] == "Incorrect password"
+    assert response.json()["detail"] == "Invalid email or password"

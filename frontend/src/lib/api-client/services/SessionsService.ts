@@ -21,6 +21,17 @@ export class SessionsService {
         });
     }
     /**
+     * Get non-ended sessions for unauthenticated spectating
+     * @returns Session List of public sessions
+     * @throws ApiError
+     */
+    public static getSessionsPublic(): CancelablePromise<Array<Session>> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/sessions/public',
+        });
+    }
+    /**
      * Create a new session
      * @param requestBody
      * @returns Session Session created
@@ -55,6 +66,27 @@ export class SessionsService {
                 'id': id,
             },
             errors: {
+                404: `Session not found`,
+            },
+        });
+    }
+    /**
+     * Get full session details for an authenticated participant
+     * @param id
+     * @returns Session Full session details
+     * @throws ApiError
+     */
+    public static getSessionsPrivate(
+        id: string,
+    ): CancelablePromise<Session> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/sessions/{id}/private',
+            path: {
+                'id': id,
+            },
+            errors: {
+                403: `Not a participant`,
                 404: `Session not found`,
             },
         });
@@ -162,7 +194,6 @@ export class SessionsService {
     public static putSessionsCursor(
         id: string,
         requestBody: {
-            userId: string;
             position: CursorPosition;
         },
     ): CancelablePromise<any> {

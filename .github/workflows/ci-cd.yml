@@ -75,3 +75,12 @@ jobs:
       
       - name: Run tests
         run: npm test -- --run
+
+      - name: Run lint
+        run: npm run lint
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: Build frontend
+        run: npm run build

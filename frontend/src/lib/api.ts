@@ -25,6 +25,27 @@ import type { ChatMessage as ApiChatMessage } from './api-client/models/ChatMess
 import type { SupportedLanguage as ApiSupportedLanguage } from './api-client/models/SupportedLanguage';
 import type { CursorPosition as ApiCursorPosition } from './api-client/models/CursorPosition';
 
+type ApiErrorLike = {
+  status?: number;
+  body?: unknown;
+};
+
+const asApiError = (error: unknown): ApiErrorLike => {
+  if (typeof error !== 'object' || error === null) return {};
+  const candidate = error as Record<string, unknown>;
+  return {
+    status: typeof candidate.status === 'number' ? candidate.status : undefined,
+    body: candidate.body,
+  };
+};
+
+const getApiDetail = (error: unknown): string | undefined => {
+  const body = asApiError(error).body;
+  if (typeof body !== 'object' || body === null) return undefined;
+  const detail = (body as Record<string, unknown>).detail;
+  return typeof detail === 'string' ? detail : undefined;
+};
+
 // Configure API Client
 // Configuration moved to main.tsx to ensure it runs before any requests
 
@@ -119,9 +140,11 @@ function mapUser(apiUser: ApiUser): User {
   };
 }
 
-function mapParticipant(apiParticipant: ApiParticipant): Participant {
+function mapParticipant(apiParticipant: ApiParticipant, index: number): Participant {
   return {
-    id: apiParticipant.id || '',
+    // PublicParticipant intentionally omits user IDs. Keep a local render key
+    // without fabricating an authorization identity.
+    id: apiParticipant.id || `public-${index}`,
     username: apiParticipant.username || '',
     avatar: apiParticipant.avatar,
     role: (apiParticipant.role as Participant['role']) || 'participant',
@@ -199,18 +222,17 @@ export const api = {
       try {
         const user = await AuthService.postAuthLogin({ email, password });
         return mapUser(user);
-      } catch (error: any) {
-        console.error('Login error:', error);
-        if (error.body) console.error('Error body:', error.body);
-
-        if (error.body && error.body.detail) {
-          throw new Error(error.body.detail);
+      } catch (error: unknown) {
+        const apiError = asApiError(error);
+        const detail = getApiDetail(error);
+        if (detail) {
+          throw new Error(detail);
         }
         // Handle case where body is missing (e.g. proxy 404 or 504)
-        if (error.status === 404) {
+        if (apiError.status === 404) {
           throw new Error('Server not reachable or user not found (404)');
         }
-        if (error.status === 504 || error.status === 502) {
+        if (apiError.status === 504 || apiError.status === 502) {
           throw new Error('Backend server is not running');
         }
         throw error;
@@ -221,9 +243,10 @@ export const api = {
       try {
         const user = await AuthService.postAuthSignup({ username, email, password });
         return mapUser(user);
-      } catch (error: any) {
-        if (error.body && error.body.detail) {
-          throw new Error(error.body.detail);
+      } catch (error: unknown) {
+        const detail = getApiDetail(error);
+        if (detail) {
+          throw new Error(detail);
         }
         throw error;
       }
@@ -237,8 +260,12 @@ export const api = {
       try {
         const user = await AuthService.getAuthMe();
         return mapUser(user);
-      } catch (error) {
-        return null; // Not authenticated
+      } catch (error: unknown) {
+        const status = asApiError(error).status;
+        if (status === 401 || status === 404) {
+          return null;
+        }
+        throw error;
       }
     },
 
@@ -271,10 +298,13 @@ export const api = {
       try {
         // Updated to use getSessions1 as per generated client if necessary, or check if getSessions(id) exists
         // Looking at generated file: public static getSessions1(id: string): ...
-        const session = await SessionsService.getSessions1(sessionId);
+        const session = await SessionsService.getSessionsPrivate(sessionId);
         return mapSession(session);
-      } catch (error) {
-        return null;
+      } catch (error: unknown) {
+        if (asApiError(error).status === 404) {
+          return null;
+        }
+        throw error;
       }
     },
 
@@ -286,9 +316,8 @@ export const api = {
       await SessionsService.putSessionsLanguage(sessionId, { language: language as ApiSupportedLanguage });
     },
 
-    async updateCursor(sessionId: string, userId: string, position: CursorPosition): Promise<void> {
+    async updateCursor(sessionId: string, position: CursorPosition): Promise<void> {
       await SessionsService.putSessionsCursor(sessionId, {
-        userId,
         position: position as ApiCursorPosition
       });
     },
@@ -372,7 +401,7 @@ export const api = {
 
   spectator: {
     async getSessions(): Promise<Session[]> {
-      const sessions = await SessionsService.getSessions();
+      const sessions = await SessionsService.getSessionsPublic();
       return sessions.map(mapSession);
     },
 
