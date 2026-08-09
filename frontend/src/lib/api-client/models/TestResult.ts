@@ -3,9 +3,9 @@
 /* tslint:disable */
 /* eslint-disable */
 export type TestResult = {
-    passed?: boolean;
-    input?: string;
-    expected?: string;
-    actual?: string;
+    actual: string;
+    expected: string;
+    input: string;
+    passed: boolean;
 };
 

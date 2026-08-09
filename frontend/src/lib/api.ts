@@ -8,14 +8,13 @@ import { OpenAPI } from './api-client/core/OpenAPI';
 import { AuthService } from './api-client/services/AuthService';
 import { SessionsService } from './api-client/services/SessionsService';
 import { ChatService } from './api-client/services/ChatService';
-
-// Browser-based code execution (WASM)
-import { executeCode, runTests } from './codeExecutor';
-
+import { ExecutionService } from './api-client/services/ExecutionService';
+import { AiAssistantService } from './api-client/services/AiAssistantService';
 
 // Import generated types as 'Api*' to avoid conflicts
 import type { User as ApiUser } from './api-client/models/User';
 import type { Session as ApiSession } from './api-client/models/Session';
+import type { PublicSession as ApiPublicSession } from './api-client/models/PublicSession';
 import type { Participant as ApiParticipant } from './api-client/models/Participant';
 import type { Problem as ApiProblem } from './api-client/models/Problem';
 import type { ChatMessage as ApiChatMessage } from './api-client/models/ChatMessage';
@@ -24,6 +23,7 @@ import type { ChatMessage as ApiChatMessage } from './api-client/models/ChatMess
 
 import type { SupportedLanguage as ApiSupportedLanguage } from './api-client/models/SupportedLanguage';
 import type { CursorPosition as ApiCursorPosition } from './api-client/models/CursorPosition';
+import type { ExecutionResult as ApiExecutionResult } from './api-client/models/ExecutionResult';
 
 type ApiErrorLike = {
   status?: number;
@@ -70,6 +70,7 @@ export interface Session {
   language: SupportedLanguage;
   participants: Participant[];
   code: string;
+  codeRevision: number;
   status: 'waiting' | 'active' | 'ended';
   createdAt: Date;
   problem?: Problem;
@@ -104,6 +105,7 @@ export interface ChatMessage {
   id: string;
   participantId: string;
   username: string;
+  authorType?: 'user' | 'assistant';
   message: string;
   timestamp: Date;
 }
@@ -127,6 +129,15 @@ export interface TestResult {
 
 export type SupportedLanguage = 'javascript' | 'typescript' | 'python' | 'java' | 'cpp' | 'go';
 
+const parseUtcDate = (value: string | undefined, field: string): Date => {
+  if (!value || !/(?:Z|[+-]\d{2}:\d{2})$/.test(value)) {
+    throw new Error(`Invalid ${field}: expected an ISO-8601 timestamp with UTC offset`);
+  }
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) throw new Error(`Invalid ${field}`);
+  return parsed;
+};
+
 // --- Type Mappers ---
 
 function mapUser(apiUser: ApiUser): User {
@@ -136,7 +147,7 @@ function mapUser(apiUser: ApiUser): User {
     email: apiUser.email || '',
     avatar: apiUser.avatar,
     role: (apiUser.role as User['role']) || 'participant',
-    createdAt: apiUser.createdAt ? new Date(apiUser.createdAt) : new Date(),
+    createdAt: parseUtcDate(apiUser.createdAt, 'user.createdAt'),
   };
 }
 
@@ -154,7 +165,7 @@ function mapParticipant(apiParticipant: ApiParticipant, index: number): Particip
     } : undefined,
     isTyping: apiParticipant.isTyping,
     color: apiParticipant.color || '#888', // Default color if missing
-    joinedAt: apiParticipant.joinedAt ? new Date(apiParticipant.joinedAt) : new Date(),
+    joinedAt: parseUtcDate(apiParticipant.joinedAt, 'participant.joinedAt'),
   };
 }
 
@@ -183,8 +194,38 @@ function mapSession(apiSession: ApiSession): Session {
     language: (apiSession.language as SupportedLanguage) || 'javascript',
     participants: (apiSession.participants || []).map(mapParticipant),
     code: apiSession.code || '',
+    codeRevision: typeof apiSession.codeRevision === 'number' ? apiSession.codeRevision : (() => { throw new Error('Session response is missing codeRevision'); })(),
     status: (apiSession.status as Session['status']) || 'waiting',
-    createdAt: apiSession.createdAt ? new Date(apiSession.createdAt) : new Date(),
+    createdAt: parseUtcDate(apiSession.createdAt, 'session.createdAt'),
+    problem: apiSession.problem ? mapProblem(apiSession.problem) : undefined,
+  };
+}
+
+function mapPublicSession(apiSession: ApiPublicSession): Session {
+  return {
+    id: apiSession.id,
+    pin: '',
+    hostId: '',
+    title: apiSession.title,
+    description: apiSession.description || '',
+    language: apiSession.language as SupportedLanguage,
+    participants: (apiSession.participants || []).map((participant, index) => ({
+      id: `public-${index}`,
+      username: participant.username,
+      avatar: participant.avatar,
+      role: participant.role as Participant['role'],
+      cursorPosition: participant.cursorPosition ? {
+        line: participant.cursorPosition.line,
+        column: participant.cursorPosition.column,
+      } : undefined,
+      isTyping: participant.isTyping,
+      color: participant.color || '#888',
+      joinedAt: parseUtcDate(participant.joinedAt, 'participant.joinedAt'),
+    })),
+    code: apiSession.code || '',
+    codeRevision: apiSession.codeRevision,
+    status: apiSession.status as Session['status'],
+    createdAt: parseUtcDate(apiSession.createdAt, 'session.createdAt'),
     problem: apiSession.problem ? mapProblem(apiSession.problem) : undefined,
   };
 }
@@ -194,8 +235,9 @@ function mapChatMessage(apiMsg: ApiChatMessage): ChatMessage {
     id: apiMsg.id || '',
     participantId: apiMsg.participantId || '',
     username: apiMsg.username || '',
+    authorType: (apiMsg.authorType as ChatMessage['authorType']) || 'user',
     message: apiMsg.message || '',
-    timestamp: apiMsg.timestamp ? new Date(apiMsg.timestamp) : new Date(),
+    timestamp: parseUtcDate(apiMsg.timestamp, 'message.timestamp'),
   };
 }
 
@@ -253,7 +295,7 @@ export const api = {
     },
 
     async logout(): Promise<void> {
-      return AuthService.postAuthLogout();
+      await AuthService.postAuthLogout();
     },
 
     async getCurrentUser(): Promise<User | null> {
@@ -262,26 +304,23 @@ export const api = {
         return mapUser(user);
       } catch (error: unknown) {
         const status = asApiError(error).status;
-        if (status === 401 || status === 404) {
+        if (status === 401) {
           return null;
         }
         throw error;
       }
     },
 
-    async guestJoin(username: string): Promise<User> {
-      const user = await AuthService.postAuthGuest({ username });
-      return mapUser(user);
-    },
   },
 
   sessions: {
     async create(title: string, language: SupportedLanguage = 'javascript'): Promise<Session> {
-      const session = await SessionsService.postSessions({
-        title,
-        language: language as ApiSupportedLanguage
-      });
+      const session = await SessionsService.postSessions({ title, language: language as ApiSupportedLanguage });
       return mapSession(session);
+    },
+
+    async start(sessionId: string): Promise<void> {
+      await SessionsService.startSessionSessionsIdStartPost({ id: sessionId });
     },
 
     async join(sessionId: string, pin: string): Promise<Session> {
@@ -292,6 +331,33 @@ export const api = {
     async joinByPin(pin: string): Promise<Session> {
       const session = await SessionsService.postSessionsJoinByPin({ pin });
       return mapSession(session);
+    },
+
+    async guestJoin(sessionId: string, username: string, pin: string): Promise<{ user: User; session: Session }> {
+      const attemptKey = `guest-attempt:${sessionId}`;
+      let attempt: { attemptId: string; attemptSecret: string } | undefined;
+      try { attempt = JSON.parse(window.localStorage.getItem(attemptKey) || 'null'); } catch { /* ignore malformed local state */ }
+      if (!attempt?.attemptId || !attempt?.attemptSecret) {
+        const random = new Uint8Array(32);
+        crypto.getRandomValues(random);
+        const encoded = btoa(String.fromCharCode(...random)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+        attempt = { attemptId: `${crypto.randomUUID()}_${Date.now()}`, attemptSecret: encoded };
+        window.localStorage.setItem(attemptKey, JSON.stringify(attempt));
+      }
+      const data = await SessionsService.guestJoinSessionSessionsIdGuestJoinPost({
+        id: sessionId,
+        requestBody: { username, pin, attemptId: attempt.attemptId, attemptSecret: attempt.attemptSecret },
+      });
+      return { user: mapUser(data.user), session: mapSession(data.session) };
+    },
+
+    async getPublic(sessionId: string): Promise<Session | null> {
+      try {
+        return mapPublicSession(await SessionsService.getSessions1(sessionId));
+      } catch (error: unknown) {
+        if (asApiError(error).status === 404) return null;
+        throw error;
+      }
     },
 
     async get(sessionId: string): Promise<Session | null> {
@@ -308,18 +374,18 @@ export const api = {
       }
     },
 
-    async updateCode(sessionId: string, code: string): Promise<void> {
-      await SessionsService.putSessionsCode(sessionId, { code });
+    async updateCode(sessionId: string, code: string, baseRevision?: number): Promise<number> {
+      const result = await SessionsService.putSessionsCode(sessionId, baseRevision === undefined ? { code } as never : { code, baseRevision });
+      return result?.codeRevision ?? 0;
     },
 
-    async updateLanguage(sessionId: string, language: SupportedLanguage): Promise<void> {
-      await SessionsService.putSessionsLanguage(sessionId, { language: language as ApiSupportedLanguage });
+    async updateLanguage(sessionId: string, language: SupportedLanguage, baseRevision?: number): Promise<number> {
+      const result = await SessionsService.putSessionsLanguage(sessionId, baseRevision === undefined ? { language: language as ApiSupportedLanguage } as never : { language: language as ApiSupportedLanguage, baseRevision });
+      return result?.codeRevision ?? 0;
     },
 
     async updateCursor(sessionId: string, position: CursorPosition): Promise<void> {
-      await SessionsService.putSessionsCursor(sessionId, {
-        position: position as ApiCursorPosition
-      });
+      await SessionsService.putSessionsCursor(sessionId, { position: position as ApiCursorPosition });
     },
 
     async leave(sessionId: string): Promise<void> {
@@ -332,7 +398,7 @@ export const api = {
 
     async getActive(): Promise<Session[]> {
       const sessions = await SessionsService.getSessions();
-      return sessions.map(mapSession);
+      return sessions.map(mapPublicSession);
     },
   },
 
@@ -348,29 +414,12 @@ export const api = {
     },
   },
 
-  execution: {
-    async run(code: string, language: SupportedLanguage): Promise<ExecutionResult> {
-      // Execute code locally in the browser using WASM for security
-      return executeCode(code, language);
-    },
-
-    async test(code: string, language: SupportedLanguage, problem: Problem): Promise<ExecutionResult> {
-      // Run tests locally in the browser using WASM for security
-      return runTests(code, language, problem);
-    },
-  },
-
   ai: {
-    async getGuidance(sessionId: string, message: string, problemContext?: Problem): Promise<ChatMessage> {
-      const response = await fetch('/api/ai/assist', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
+    async getGuidance(sessionId: string, message: string, problemContext?: Problem, requestId = crypto.randomUUID().replace(/-/g, '')): Promise<ChatMessage> {
+      const response = await AiAssistantService.getAiAssistanceAiAssistPost({ requestBody: {
           sessionId,
           message,
+          requestId,
           problemContext: problemContext ? {
             title: problemContext.title,
             description: problemContext.description,
@@ -378,22 +427,20 @@ export const api = {
             constraints: problemContext.constraints,
             difficulty: problemContext.difficulty,
           } : undefined,
-        }),
-      });
+        } });
+      return mapChatMessage(response as unknown as ApiChatMessage);
+    },
+  },
 
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({ detail: 'AI service unavailable' }));
-        throw new Error(error.detail || 'Failed to get AI guidance');
-      }
+  execution: {
+    async run(code: string, language: SupportedLanguage): Promise<ExecutionResult> {
+      await ExecutionService.postExecutionRun({ code, language: language as ApiSupportedLanguage });
+      return { stdout: '', stderr: 'Collaborative execution requires a fully isolated runtime and is disabled.', exitCode: 1, executionTime: 0 };
+    },
 
-      const data = await response.json();
-      return {
-        id: data.id,
-        participantId: data.participantId,
-        username: data.username,
-        message: data.message,
-        timestamp: new Date(data.timestamp),
-      };
+    async test(code: string, language: SupportedLanguage, problem: Problem): Promise<ExecutionResult> {
+      await ExecutionService.postExecutionTest({ code, language: language as ApiSupportedLanguage, problem: problem as unknown as ApiProblem });
+      return { stdout: '', stderr: 'Collaborative execution requires a fully isolated runtime and is disabled.', exitCode: 1, executionTime: 0 };
     },
   },
 
@@ -401,17 +448,29 @@ export const api = {
 
   spectator: {
     async getSessions(): Promise<Session[]> {
-      const sessions = await SessionsService.getSessionsPublic();
+      const sessions = await SessionsService.getPublicSessionsSessionsPublicGet();
       return sessions.map(mapSession);
     },
 
     async watch(sessionId: string): Promise<Session | null> {
       try {
         const session = await SessionsService.getSessions1(sessionId);
-        return mapSession(session);
-      } catch (error) {
-        return null;
+        return mapPublicSession(session);
+      } catch (error: unknown) {
+        if (asApiError(error).status === 404) return null;
+        throw error;
       }
+    },
+
+    async getMessages(sessionId: string): Promise<ChatMessage[]> {
+      const rows = await SessionsService.getPublicMessagesSessionsIdPublicMessagesGet({ id: sessionId, limit: 50 });
+      return rows.map((row: { username: string; message: string; timestamp: string; authorType: 'user' | 'assistant' }) => ({
+        // Public DTOs intentionally omit database IDs.  Derive a stable
+        // render/merge key from the immutable transcript projection instead
+        // of a polling-page index that shifts as the bounded window advances.
+        id: `${row.timestamp}|${row.authorType}|${row.username}|${row.message}`, participantId: '', authorType: row.authorType, username: row.username,
+        message: row.message, timestamp: parseUtcDate(row.timestamp, 'public message timestamp'),
+      }));
     },
   },
 

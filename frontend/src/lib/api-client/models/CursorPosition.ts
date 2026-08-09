@@ -3,7 +3,7 @@
 /* tslint:disable */
 /* eslint-disable */
 export type CursorPosition = {
-    line?: number;
-    column?: number;
+    column: number;
+    line: number;
 };
 

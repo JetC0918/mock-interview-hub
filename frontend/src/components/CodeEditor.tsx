@@ -1,8 +1,14 @@
 import React, { useRef, useEffect, useState } from 'react';
-import Editor, { OnMount } from '@monaco-editor/react';
+import Editor, { OnMount, loader } from '@monaco-editor/react';
 import type { Monaco } from '@monaco-editor/react';
 import type { editor as MonacoEditor } from 'monaco-editor';
 import { SupportedLanguage, Participant } from '@/lib/api';
+
+// Keep Monaco assets same-origin. The default loader points at jsDelivr,
+// which makes the editor dependent on a third-party CDN and violates the
+// production CSP/supply-chain boundary. The image copies this directory from
+// the pinned monaco-editor package into /monaco/vs.
+loader.config({ paths: { vs: '/monaco/vs' } });
 
 interface CodeEditorProps {
   code: string;

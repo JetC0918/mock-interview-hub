@@ -3,10 +3,17 @@
 /* tslint:disable */
 /* eslint-disable */
 export type ChatMessage = {
-    id?: string;
-    participantId?: string;
-    username?: string;
-    message?: string;
-    timestamp?: string;
+    authorType: ChatMessage.authorType;
+    id: string;
+    message: string;
+    participantId: string;
+    timestamp: string;
+    username: string;
 };
+export namespace ChatMessage {
+    export enum authorType {
+        USER = 'user',
+        ASSISTANT = 'assistant',
+    }
+}
 

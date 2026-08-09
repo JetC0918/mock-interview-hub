@@ -1,4 +1,5 @@
-# Docker Compose for Combined Container Deployment
+# Development-only legacy combined stack. Production deployment is Render
+# via render.yaml; do not use this file as a production manifest.
 # Uses a single container for frontend + backend
 
 services:

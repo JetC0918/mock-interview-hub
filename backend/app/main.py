@@ -2,24 +2,30 @@ import os
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())  # Load .env from project root
 
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
 from .routers import auth, sessions, execution, ai
-from .database.config import init_db, SessionLocal
+from .database.config import init_db, verify_migrated_schema, SessionLocal
 from .database.service import DatabaseService, seed_database
 from .utils.rate_limit import limiter
+from .middleware.body_limit import BodySizeLimitMiddleware
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import Session as DBSession
+from .database.config import get_db
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Initialize database on startup."""
-    init_db()
-
     app_env = os.environ.get("APP_ENV", "development").lower()
     seed_demo_data = os.environ.get("SEED_DEMO_DATA", "").lower() == "true"
     if app_env == "production":
+        verify_migrated_schema()
+        if len(os.environ.get("IDEMPOTENCY_SECRET", "")) < 32:
+            raise RuntimeError("IDEMPOTENCY_SECRET must be configured with at least 32 characters")
         if os.environ.get("COOKIE_SECURE", "").lower() != "true":
             raise RuntimeError("COOKIE_SECURE=true is required in production")
         if seed_demo_data:
@@ -32,7 +38,9 @@ async def lifespan(app: FastAPI):
                 )
         finally:
             db.close()
-    elif seed_demo_data:
+    elif app_env != "test":
+        init_db()
+    if app_env != "production" and seed_demo_data:
         db = SessionLocal()
         try:
             seed_database(db)
@@ -47,6 +55,14 @@ app = FastAPI(
     version="1.0.0",
     lifespan=lifespan
 )
+app.add_middleware(BodySizeLimitMiddleware, max_bytes=1_048_576)
+
+
+@app.middleware("http")
+async def prevent_dynamic_response_caching(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Cache-Control"] = "no-store"
+    return response
 
 # CORS Configuration
 # Get allowed origins from environment or use defaults for development
@@ -85,6 +101,12 @@ def read_root():
 
 
 @app.get("/health")
-def health_check():
-    """Health check endpoint for load balancers and container orchestration."""
-    return {"status": "healthy"}
+def health_check(db: DBSession = Depends(get_db)):
+    """Readiness check: the process is ready only when its database responds."""
+    try:
+        if db.bind and db.bind.dialect.name == "postgresql":
+            db.execute(text("SET LOCAL statement_timeout = '3000ms'"))
+        db.execute(text("SELECT 1"))
+    except SQLAlchemyError:
+        raise HTTPException(status_code=503, detail="Database unavailable")
+    return {"status": "healthy", "database": "ready"}

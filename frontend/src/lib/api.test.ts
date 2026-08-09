@@ -14,7 +14,6 @@ vi.mock('./api-client/services/AuthService', () => ({
     postAuthSignup: vi.fn(),
     postAuthLogout: vi.fn(),
     getAuthMe: vi.fn(),
-    postAuthGuest: vi.fn(),
   },
 }));
 
@@ -116,21 +115,6 @@ describe('API Module', () => {
       expect(AuthService.postAuthLogout).toHaveBeenCalled();
     });
 
-    it('should join as guest with username', async () => {
-      const mockUser = {
-        id: 'guest',
-        username: 'GuestUser',
-        email: '',
-        role: 'participant',
-        createdAt: new Date().toISOString()
-      };
-      vi.mocked(AuthService.postAuthGuest).mockResolvedValue(mockUser as unknown as Awaited<ReturnType<typeof AuthService.postAuthGuest>>);
-
-      const user = await api.auth.guestJoin('GuestUser');
-
-      expect(user.username).toBe('GuestUser');
-      expect(user.role).toBe('participant');
-    });
   });
 
   describe('Session Management', () => {
@@ -166,7 +150,7 @@ describe('API Module', () => {
     });
 
     it('should return null for non-existent session', async () => {
-      vi.mocked(SessionsService.getSessionsPrivate).mockRejectedValue(new Error('Not found'));
+      vi.mocked(SessionsService.getSessionsPrivate).mockRejectedValue(Object.assign(new Error('Not found'), { status: 404 }));
       const session = await api.sessions.get('non-existent-id');
       expect(session).toBeNull();
     });

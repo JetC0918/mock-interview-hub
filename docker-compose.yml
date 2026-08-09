@@ -1,3 +1,5 @@
+# Development-only compose stack. Render uses render.yaml and the immutable
+# root Dockerfile; this file intentionally keeps hot reload/source mounts.
 services:
   # PostgreSQL Database
   db:

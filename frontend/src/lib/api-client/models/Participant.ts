@@ -3,21 +3,15 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { CursorPosition } from './CursorPosition';
+import type { Role } from './Role';
 export type Participant = {
-    id?: string;
-    username?: string;
-    avatar?: string;
-    role?: Participant.role;
-    cursorPosition?: CursorPosition;
+    avatar?: (string | null);
+    color?: (string | null);
+    cursorPosition?: (CursorPosition | null);
+    id: string;
     isTyping?: boolean;
-    color?: string;
-    joinedAt?: string;
+    joinedAt: string;
+    role: Role;
+    username: string;
 };
-export namespace Participant {
-    export enum role {
-        HOST = 'host',
-        PARTICIPANT = 'participant',
-        SPECTATOR = 'spectator',
-    }
-}
 

@@ -33,7 +33,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newMessage.trim() && !disabled) {
+    if (newMessage.trim() && !disabled && !isAILoading) {
       try {
         await onSendMessage(newMessage.trim());
         setNewMessage('');
@@ -51,7 +51,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
     return participant?.color || 'hsl(var(--muted-foreground))';
   };
 
-  const isAIMessage = (participantId: string) => participantId === 'ai-assistant';
+  const isAIMessage = (message: ChatMessage) => message.authorType === 'assistant' || message.participantId === 'ai-assistant';
 
   return (
     <div className="flex flex-col h-full bg-card rounded-lg border border-border">
@@ -76,7 +76,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                 <div
                   className={`max-w-[85%] rounded-lg px-3 py-2 ${message.participantId === currentUserId
                       ? 'bg-primary text-primary-foreground'
-                      : isAIMessage(message.participantId)
+                        : isAIMessage(message)
                         ? 'bg-gradient-to-br from-purple-500/20 to-blue-500/20 border border-purple-500/30'
                         : 'bg-secondary'
                     }`}
@@ -86,7 +86,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({
                       className="text-xs font-medium block mb-1 flex items-center gap-1"
                       style={{ color: getParticipantColor(message.participantId) }}
                     >
-                      {isAIMessage(message.participantId) && (
+                      {isAIMessage(message) && (
                         <Bot className="h-3 w-3" />
                       )}
                       {message.username}

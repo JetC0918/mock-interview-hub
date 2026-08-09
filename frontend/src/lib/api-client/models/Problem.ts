@@ -2,23 +2,14 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { Difficulty } from './Difficulty';
+import type { Example } from './Example';
 export type Problem = {
-    id?: string;
-    title?: string;
-    description?: string;
-    examples?: Array<{
-        input?: string;
-        output?: string;
-        explanation?: string;
-    }>;
-    constraints?: Array<string>;
-    difficulty?: Problem.difficulty;
+    constraints: Array<string>;
+    description: string;
+    difficulty: Difficulty;
+    examples: Array<Example>;
+    id: string;
+    title: string;
 };
-export namespace Problem {
-    export enum difficulty {
-        EASY = 'easy',
-        MEDIUM = 'medium',
-        HARD = 'hard',
-    }
-}
 

@@ -50,6 +50,7 @@ function mergeIntervals(intervals: Interval[]): Interval[] {
   return merged;
 }`,
     status: 'active',
+    codeRevision: 0,
     createdAt: minutesAgo(38),
     problem: {
       id: 'merge-intervals',
@@ -103,6 +104,7 @@ function mergeIntervals(intervals: Interval[]): Interval[] {
 
     return []`,
     status: 'active',
+    codeRevision: 0,
     createdAt: minutesAgo(45),
   },
   {
@@ -127,6 +129,7 @@ function mergeIntervals(intervals: Interval[]): Interval[] {
   }, {});
 }`,
     status: 'active',
+    codeRevision: 0,
     createdAt: minutesAgo(15),
   },
 ];

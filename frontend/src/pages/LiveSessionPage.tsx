@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import {
   ArrowLeft,
@@ -44,26 +44,41 @@ const LiveSessionPage: React.FC = () => {
   const [session, setSession] = useState<Session | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [now, setNow] = useState(Date.now());
+  const requestGeneration = useRef(0);
+  const allowDemo = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === '1';
 
   useEffect(() => {
     let isCurrent = true;
 
     const loadSession = async () => {
-      const demoSession = getDemoLiveSession(sessionId);
-      const liveSession = demoSession ?? await api.spectator.watch(sessionId);
-
-      if (!isCurrent) return;
-      setSession(liveSession);
-      setMessages(getDemoLiveMessages(sessionId));
-      setIsLoading(false);
+      const generation = ++requestGeneration.current;
+      try {
+        const demoSession = allowDemo ? getDemoLiveSession(sessionId) : null;
+        const liveSession = demoSession ?? await api.spectator.watch(sessionId);
+        if (!liveSession) throw new Error('This session is no longer available.');
+        const liveMessages = demoSession ? getDemoLiveMessages(sessionId) : await api.spectator.getMessages(sessionId);
+        if (!isCurrent || generation !== requestGeneration.current) return;
+        setSession(liveSession);
+        setMessages(liveMessages);
+        setLoadError(null);
+      } catch (error) {
+        if (isCurrent && generation === requestGeneration.current) {
+          setLoadError(error instanceof Error ? error.message : 'Live session is temporarily unavailable.');
+        }
+      } finally {
+        if (isCurrent && generation === requestGeneration.current) setIsLoading(false);
+      }
     };
 
-    loadSession();
+    void loadSession();
+    const interval = window.setInterval(() => void loadSession(), 5000);
     return () => {
       isCurrent = false;
+      window.clearInterval(interval);
     };
-  }, [sessionId]);
+  }, [allowDemo, sessionId]);
 
   useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), 30_000);
@@ -86,13 +101,13 @@ const LiveSessionPage: React.FC = () => {
     );
   }
 
-  if (!session) {
+  if (!session || loadError) {
     return (
       <div className="min-h-screen bg-background flex items-center justify-center p-6">
         <div className="max-w-md text-center">
           <Radio className="h-10 w-10 text-muted-foreground mx-auto mb-4" />
-          <h1 className="text-2xl font-semibold mb-2">This session is no longer live</h1>
-          <p className="text-muted-foreground mb-6">The interview may have ended or the viewing link is invalid.</p>
+          <h1 className="text-2xl font-semibold mb-2">{loadError || 'This session is no longer live'}</h1>
+          <p className="text-muted-foreground mb-6">The interview may have ended, or the viewing link is invalid.</p>
           <Button onClick={() => navigate('/spectate')}>Browse live sessions</Button>
         </div>
       </div>
@@ -122,7 +137,7 @@ const LiveSessionPage: React.FC = () => {
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-destructive opacity-70" />
                     <span className="relative inline-flex h-2 w-2 rounded-full bg-destructive" />
                   </span>
-                  Live
+                   {session.status === 'active' ? 'Live' : session.status === 'ended' ? 'Ended' : 'Waiting'}
                 </span>
                 <span className="text-border">/</span>
                 <span className="flex items-center gap-1 text-xs text-muted-foreground">

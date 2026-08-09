@@ -1,6 +1,7 @@
 """Authentication utilities for route authorization."""
 
-from fastapi import HTTPException, Depends, Cookie, status
+from fastapi import HTTPException, Depends, status
+from fastapi.security import APIKeyCookie
 from typing import Optional
 from sqlalchemy.orm import Session as DBSession
 
@@ -8,13 +9,14 @@ from ..database.config import get_db
 from ..database.service import DatabaseService
 
 COOKIE_NAME = "session_token"
+cookie_scheme = APIKeyCookie(name=COOKIE_NAME, auto_error=False)
 
 
 def get_service(db: DBSession = Depends(get_db)) -> DatabaseService:
     return DatabaseService(db)
 
 
-def get_current_session_token(token: Optional[str] = Cookie(None, alias=COOKIE_NAME)) -> Optional[str]:
+def get_current_session_token(token: Optional[str] = Depends(cookie_scheme)) -> Optional[str]:
     """Read the opaque session token from the cookie."""
     return token
 

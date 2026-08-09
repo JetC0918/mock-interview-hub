@@ -2,19 +2,13 @@
 /* istanbul ignore file */
 /* tslint:disable */
 /* eslint-disable */
+import type { Role } from './Role';
 export type User = {
-    id?: string;
-    username?: string;
-    email?: string;
-    avatar?: string;
-    role?: User.role;
-    createdAt?: string;
+    avatar?: (string | null);
+    createdAt?: (string | null);
+    email?: (string | null);
+    id: string;
+    role?: (Role | null);
+    username: string;
 };
-export namespace User {
-    export enum role {
-        HOST = 'host',
-        PARTICIPANT = 'participant',
-        SPECTATOR = 'spectator',
-    }
-}
 

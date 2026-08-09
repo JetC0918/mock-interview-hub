@@ -1,0 +1,32 @@
+services:
+  - type: web
+    name: mock-interview-hub
+    runtime: docker
+    region: singapore
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    preDeployCommand: "uv run alembic -c /app/backend/alembic.ini upgrade head"
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
+    envVars:
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: SEED_DEMO_DATA
+        value: "false"
+      - key: DATABASE_URL
+        fromDatabase:
+          name: mock-interview-db
+          property: connectionString
+      - key: DEEPSEEK_API_KEY
+        sync: false
+      - key: IDEMPOTENCY_SECRET
+        generateValue: true
+
+databases:
+  - name: mock-interview-db
+    region: singapore
+    plan: basic-256mb
+    ipAllowList: []

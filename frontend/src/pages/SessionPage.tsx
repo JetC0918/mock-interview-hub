@@ -25,7 +25,7 @@ import {
   ResizablePanelGroup,
 } from '@/components/ui/resizable';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Play, Copy, Check, Share2, Loader2, Hash, TestTube } from 'lucide-react';
+import { Play, Copy, Check, Share2, Loader2, Hash, TestTube, Radio } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 
@@ -40,7 +40,7 @@ const getErrorStatus = (error: unknown) => {
 
 const SessionPage: React.FC = () => {
   const { sessionId } = useParams<{ sessionId: string }>();
-  const { user, isLoading: authLoading, guestJoin } = useAuth();
+  const { user, isLoading: authLoading, guestJoinSession } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
 
@@ -56,12 +56,16 @@ const SessionPage: React.FC = () => {
   const [guestName, setGuestName] = useState('');
   const [joinPin, setJoinPin] = useState('');
   const [isJoining, setIsJoining] = useState(false);
+  const [isStarting, setIsStarting] = useState(false);
+  const [canJoinExisting, setCanJoinExisting] = useState(false);
   const codeTimerRef = useRef<number | null>(null);
   const codeQueueRef = useRef<Promise<void>>(Promise.resolve());
   const latestCodeRef = useRef('');
   const codeDirtyRef = useRef(false);
   const sessionRef = useRef<Session | null>(null);
+  const revisionRef = useRef(0);
   const mountedRef = useRef(true);
+  const aiRequestIdsRef = useRef(new Map<string, string>());
 
   useEffect(() => {
     sessionRef.current = session;
@@ -72,6 +76,32 @@ const SessionPage: React.FC = () => {
     if (codeTimerRef.current !== null) {
       window.clearTimeout(codeTimerRef.current);
     }
+    const current = sessionRef.current;
+    if (current && current.status !== 'ended' && codeDirtyRef.current) {
+      const codeToFlush = latestCodeRef.current;
+      // SPA navigation does not fire beforeunload. Queue the latest dirty
+      // document so leaving the page cannot silently discard the edit.
+      void codeQueueRef.current.then(async () => {
+        try {
+          const nextRevision = await api.sessions.updateCode(current.id, codeToFlush, revisionRef.current);
+          revisionRef.current = nextRevision;
+          if (latestCodeRef.current === codeToFlush) codeDirtyRef.current = false;
+        } catch {
+          // The beforeunload warning already surfaced the unsaved state; a
+          // failed background flush must not create an unhandled rejection.
+        }
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    const warnOnUnsaved = (event: BeforeUnloadEvent) => {
+      if (!codeDirtyRef.current) return;
+      event.preventDefault();
+      event.returnValue = '';
+    };
+    window.addEventListener('beforeunload', warnOnUnsaved);
+    return () => window.removeEventListener('beforeunload', warnOnUnsaved);
   }, []);
 
   const loadSession = useCallback(async () => {
@@ -88,11 +118,16 @@ const SessionPage: React.FC = () => {
       }
       latestCodeRef.current = sessionData.code;
       codeDirtyRef.current = false;
+      revisionRef.current = sessionData.codeRevision;
       setSession(sessionData);
 
       const messages = await api.chat.getMessages(sessionId!);
       setChatMessages(messages);
     } catch (error: unknown) {
+      if (getErrorStatus(error) === 403) {
+        setCanJoinExisting(true);
+        return;
+      }
       toast({
         title: 'Error',
         description: getErrorMessage(error, 'Failed to load session'),
@@ -115,6 +150,7 @@ const SessionPage: React.FC = () => {
       try {
         const sessionData = await api.sessions.get(sessionId!);
         if (sessionData) {
+          revisionRef.current = Math.max(revisionRef.current, sessionData.codeRevision);
           setSession((current) => {
             if (!current) return sessionData;
             if (codeDirtyRef.current) {
@@ -143,7 +179,7 @@ const SessionPage: React.FC = () => {
   }, [sessionId, toast]);
 
   const handleGuestJoin = async () => {
-    if (!guestName.trim()) {
+    if (!user && !guestName.trim()) {
       toast({
         title: 'Error',
         description: 'Please enter your name',
@@ -158,10 +194,19 @@ const SessionPage: React.FC = () => {
         toast({ title: 'Join secret required', description: 'Paste the session join secret shared by the host.', variant: 'destructive' });
         return;
       }
-      await guestJoin(guestName.trim());
-      await api.sessions.joinByPin(joinPin.trim());
-
-      await loadSession();
+      // Authenticated non-members use the normal membership admission path;
+      // only unauthenticated viewers receive a durable guest identity.
+      const joined = user
+        ? await api.sessions.join(sessionId!, joinPin.trim())
+        : await guestJoinSession(sessionId!, guestName.trim(), joinPin.trim());
+      setCanJoinExisting(false);
+      setSession(joined);
+      sessionRef.current = joined;
+      latestCodeRef.current = joined.code;
+      revisionRef.current = joined.codeRevision;
+      codeDirtyRef.current = false;
+      setChatMessages(await api.chat.getMessages(sessionId!));
+      setIsLoading(false);
     } catch (error: unknown) {
       toast({
         title: 'Error',
@@ -187,11 +232,14 @@ const SessionPage: React.FC = () => {
       const codeToSend = latestCodeRef.current;
       codeQueueRef.current = codeQueueRef.current.then(async () => {
         try {
-          await api.sessions.updateCode(current.id, codeToSend);
+          const nextRevision = await api.sessions.updateCode(current.id, codeToSend, revisionRef.current);
+          revisionRef.current = nextRevision;
+          setSession((previous) => previous ? { ...previous, codeRevision: nextRevision } : previous);
           if (latestCodeRef.current === codeToSend) codeDirtyRef.current = false;
         } catch (error: unknown) {
           if (mountedRef.current) {
-            toast({ title: 'Code save failed', description: getErrorMessage(error, 'Your latest code was not saved.'), variant: 'destructive' });
+            const status = getErrorStatus(error);
+            toast({ title: status === 409 ? 'Code changed remotely' : 'Code save failed', description: status === 409 ? 'Your unsaved edit is preserved; reload or merge the newer revision before retrying.' : getErrorMessage(error, 'Your latest code was not saved.'), variant: 'destructive' });
           }
         }
       });
@@ -202,8 +250,9 @@ const SessionPage: React.FC = () => {
     const current = sessionRef.current;
     if (!current || current.status === 'ended') return;
     try {
-      await api.sessions.updateLanguage(current.id, language);
-      setSession((previous) => previous ? { ...previous, language } : previous);
+      const nextRevision = await api.sessions.updateLanguage(current.id, language, revisionRef.current);
+      revisionRef.current = nextRevision;
+      setSession((previous) => previous ? { ...previous, language, codeRevision: nextRevision } : previous);
     } catch (error: unknown) {
       toast({ title: 'Language update failed', description: getErrorMessage(error, 'The session language was not changed.'), variant: 'destructive' });
     }
@@ -249,14 +298,19 @@ const SessionPage: React.FC = () => {
 
   const handleSendMessage = async (message: string) => {
     if (!session) return;
+    const trimmed = message.trim();
+    // AI exchanges are atomic on the server: the endpoint persists both the
+    // prompt and assistant reply. Never pre-send the prompt through /chat or
+    // it will appear twice in the shared transcript.
+    if (/^@ai(?:\s|$)/i.test(trimmed)) {
+      await handleAIAssist(trimmed);
+      const refreshed = await api.chat.getMessages(session.id);
+      setChatMessages(refreshed);
+      return;
+    }
     try {
-      const chatMessage = await api.chat.send(session.id, message);
+      const chatMessage = await api.chat.send(session.id, trimmed);
       setChatMessages((prev) => [...prev, chatMessage]);
-
-      // Check if message triggers AI
-      if (message.toLowerCase().includes('@ai')) {
-        handleAIAssist(message);
-      }
     } catch (error: unknown) {
       toast({
         title: 'Message not sent',
@@ -275,7 +329,12 @@ const SessionPage: React.FC = () => {
       const aiResponse = await api.ai.getGuidance(
         session.id,
         message,
-        session.problem
+        session.problem,
+        aiRequestIdsRef.current.get(message) || (() => {
+          const id = crypto.randomUUID().replace(/-/g, '');
+          aiRequestIdsRef.current.set(message, id);
+          return id;
+        })(),
       );
       setChatMessages((prev) => [...prev, aiResponse]);
     } catch (error: unknown) {
@@ -289,16 +348,31 @@ const SessionPage: React.FC = () => {
     }
   };
 
-  const copyShareInfo = () => {
+  const copyShareInfo = async () => {
     if (!session) return;
     const link = api.utils.generateShareableLink(session.id);
-    navigator.clipboard.writeText(`Join my CodioLive session:\n${link}\nJoin secret: ${session.pin}`);
-    setCopied(true);
-    toast({
-      title: 'Copied!',
-      description: 'Share link and join secret copied to clipboard',
-    });
-    setTimeout(() => setCopied(false), 2000);
+    try {
+      await navigator.clipboard.writeText(`Join my CodioLive session:\n${link}\nJoin secret: ${session.pin}`);
+      setCopied(true);
+      toast({ title: 'Copied!', description: 'Share link and join secret copied to clipboard' });
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast({ title: 'Copy failed', description: 'Copy the share link and secret manually.', variant: 'destructive' });
+    }
+  };
+
+  const handleStartSession = async () => {
+    if (!session || !user || session.status !== 'waiting' || session.hostId !== user.id) return;
+    setIsStarting(true);
+    try {
+      await api.sessions.start(session.id);
+      setSession((current) => current ? { ...current, status: 'active' } : current);
+      toast({ title: 'Session started', description: 'The interview is now live for participants and spectators.' });
+    } catch (error: unknown) {
+      toast({ title: 'Unable to start session', description: getErrorMessage(error, 'The session could not be started.'), variant: 'destructive' });
+    } finally {
+      setIsStarting(false);
+    }
   };
 
   const languages = api.utils.getSupportedLanguages();
@@ -313,8 +387,8 @@ const SessionPage: React.FC = () => {
     );
   }
 
-  // Guest join screen
-  if (!user) {
+  // Guest and authenticated non-member admission share the validated flow.
+  if (!user || canJoinExisting) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -326,7 +400,7 @@ const SessionPage: React.FC = () => {
           <CardHeader className="text-center">
             <CardTitle className="text-2xl">Join Session</CardTitle>
             <CardDescription>
-              Enter your name to join as a guest
+              {user ? 'Enter the session join secret to continue' : 'Enter your name and join secret to enter as a guest'}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -411,7 +485,7 @@ const SessionPage: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-background">
-      <header className="h-14 border-b border-border bg-card flex items-center justify-between px-4 shrink-0">
+      <header className="min-h-14 border-b border-border bg-card flex flex-wrap items-center justify-between gap-2 px-3 sm:px-4 shrink-0">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => navigate('/lobby')}>
             ← Lobby
@@ -428,7 +502,23 @@ const SessionPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2 min-w-0">
+          {session.status === 'waiting' && session.hostId === user.id && (
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await api.sessions.start(session.id);
+                  setSession((current) => current ? { ...current, status: 'active' } : current);
+                } catch (error) {
+                  toast({ title: 'Could not start session', description: getErrorMessage(error, 'Try again.'), variant: 'destructive' });
+                }
+              }}
+            >
+              Start session
+            </Button>
+          )}
           <Select value={session.language} onValueChange={handleLanguageChange} disabled={isEnded}>
             <SelectTrigger className="w-[140px]">
               <SelectValue />
@@ -451,6 +541,13 @@ const SessionPage: React.FC = () => {
             Share
           </Button>
 
+          {session.status === 'waiting' && session.hostId === user?.id && (
+            <Button onClick={handleStartSession} disabled={isStarting} size="sm">
+              {isStarting ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Radio className="h-4 w-4 mr-2" />}
+              Start interview
+            </Button>
+          )}
+
           <Button onClick={handleRunCode} disabled={isRunning || isEnded} size="sm">
             {isRunning ? (
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -470,7 +567,7 @@ const SessionPage: React.FC = () => {
       </header>
 
       <div className="flex-1 min-h-0">
-        <ResizablePanelGroup direction="horizontal" className="h-full">
+        <ResizablePanelGroup direction="horizontal" className="h-full min-w-0 overflow-x-auto">
           {/* Left Panel - Problem */}
           <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
             <div className="h-full p-2">

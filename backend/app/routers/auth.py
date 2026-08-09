@@ -1,18 +1,21 @@
 import os
-from fastapi import APIRouter, HTTPException, Depends, status, Response, Cookie
+from fastapi import APIRouter, HTTPException, Depends, status, Response, Cookie, Request
 from typing import Optional
 from sqlalchemy.orm import Session as DBSession
 
 from ..models.user import User, UserCreate, UserLogin
 from ..database.config import get_db
-from ..database.service import DatabaseService
+from ..database.service import DatabaseService, DuplicateEmailError
 from ..utils.auth_utils import require_auth
+from ..utils.rate_limit import limiter
+import bcrypt
 
 router = APIRouter(prefix="/auth", tags=["Auth"])
 
 # Cookie settings
 COOKIE_NAME = "session_token"
 COOKIE_MAX_AGE = 60 * 60 * 24 * 7  # 7 days
+DUMMY_PASSWORD_HASH = bcrypt.hashpw(b"not-a-real-password", bcrypt.gensalt()).decode("utf-8")
 
 
 def get_service(db: DBSession = Depends(get_db)) -> DatabaseService:
@@ -36,15 +39,21 @@ def set_secure_cookie(response: Response, token: str):
 def login(
     user_in: UserLogin, 
     response: Response, 
+    request: Request,
     service: DatabaseService = Depends(get_service)
 ):
     """Login with email and password."""
+    limiter.check(request, "auth-login", limit=20)
     result = service.get_user_by_email_with_hash(user_in.email)
     if not result:
+        service.verify_password(user_in.password, DUMMY_PASSWORD_HASH)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     
     user, password_hash = result
-    if not password_hash or not service.verify_password(user_in.password, password_hash):
+    if not password_hash:
+        service.verify_password(user_in.password, DUMMY_PASSWORD_HASH)
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
+    if not service.verify_password(user_in.password, password_hash):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     
     set_secure_cookie(response, service.create_auth_session(user.id))
@@ -55,33 +64,21 @@ def login(
 def signup(
     user_in: UserCreate, 
     response: Response, 
+    request: Request,
     service: DatabaseService = Depends(get_service)
 ):
     """Create a new account."""
-    if user_in.email and service.get_user_by_email(user_in.email):
+    limiter.check(request, "auth-signup", limit=10)
+    if not user_in.email or not user_in.password:
         raise HTTPException(
-            status_code=400,
-            detail="Email already registered"
+            status_code=422,
+            detail="Email and password are required"
         )
-    user = service.create_user(
-        username=user_in.username, 
-        email=user_in.email,
-        password=user_in.password
-    )
-    
-    set_secure_cookie(response, service.create_auth_session(user.id))
-    return user
-
-
-@router.post("/guest", response_model=User, status_code=201)
-def guest_login(
-    user_in: UserCreate, 
-    response: Response, 
-    service: DatabaseService = Depends(get_service)
-):
-    """Join as a guest."""
-    user = service.create_user(user_in.username, None)
-    set_secure_cookie(response, service.create_auth_session(user.id))
+    try:
+        user, token = service.signup_with_session(user_in.username, str(user_in.email), user_in.password)
+    except DuplicateEmailError:
+        raise HTTPException(status_code=409, detail="Unable to create account")
+    set_secure_cookie(response, token)
     return user
 
 

@@ -34,11 +34,3 @@ export async function runTests(
 ): Promise<ExecutionResult> {
   return disabledResult();
 }
-
-export function isPyodideLoaded(): boolean {
-  return false;
-}
-
-export async function preloadPyodide(): Promise<void> {
-  throw new Error(DISABLED_MESSAGE);
-}
