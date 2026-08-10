@@ -14,7 +14,6 @@ vi.mock('./api-client/services/AuthService', () => ({
     postAuthSignup: vi.fn(),
     postAuthLogout: vi.fn(),
     getAuthMe: vi.fn(),
-    postAuthGuest: vi.fn(),
   },
 }));
 
@@ -24,6 +23,7 @@ vi.mock('./api-client/services/SessionsService', () => ({
     postSessionsJoin: vi.fn(),
     postSessionsJoinByPin: vi.fn(),
     getSessions1: vi.fn(), // getSessionById mapped to getSessions1
+    getSessionsPrivate: vi.fn(),
     putSessionsCode: vi.fn(),
     putSessionsLanguage: vi.fn(),
     putSessionsCursor: vi.fn(),
@@ -65,7 +65,7 @@ describe('API Module', () => {
         role: 'host',
         createdAt: new Date().toISOString() // API returns string
       };
-      vi.mocked(AuthService.postAuthLogin).mockResolvedValue(mockUser as any);
+      vi.mocked(AuthService.postAuthLogin).mockResolvedValue(mockUser as unknown as Awaited<ReturnType<typeof AuthService.postAuthLogin>>);
 
       const user = await api.auth.login('test@example.com', 'password123');
 
@@ -77,13 +77,12 @@ describe('API Module', () => {
     });
 
     it('login with invalid credentials throws specific error', async () => {
-      const errorBody = { detail: 'User not found' };
-      const apiError = new Error('Not Found') as any;
-      apiError.body = errorBody;
+      const errorBody = { detail: 'Invalid email or password' };
+      const apiError = Object.assign(new Error('Not Found'), { body: errorBody });
 
       vi.mocked(AuthService.postAuthLogin).mockRejectedValue(apiError);
 
-      await expect(api.auth.login('wrong@example.com', 'password')).rejects.toThrow('User not found');
+      await expect(api.auth.login('wrong@example.com', 'password')).rejects.toThrow('Invalid email or password');
     });
 
     it('should signup a new user', async () => {
@@ -94,7 +93,7 @@ describe('API Module', () => {
         role: 'host',
         createdAt: new Date().toISOString()
       };
-      vi.mocked(AuthService.postAuthSignup).mockResolvedValue(mockUser as any);
+      vi.mocked(AuthService.postAuthSignup).mockResolvedValue(mockUser as unknown as Awaited<ReturnType<typeof AuthService.postAuthSignup>>);
 
       const user = await api.auth.signup('newuser', 'new@example.com', 'password123');
 
@@ -109,28 +108,13 @@ describe('API Module', () => {
     });
 
     it('should logout a user', async () => {
-      vi.mocked(AuthService.postAuthLogout).mockResolvedValue(undefined as any);
+      vi.mocked(AuthService.postAuthLogout).mockResolvedValue(undefined);
       // Removed dependent mock checking for getCurrentUser as logout doesn't inherently call it in the implementation unless specified
 
       await api.auth.logout();
       expect(AuthService.postAuthLogout).toHaveBeenCalled();
     });
 
-    it('should join as guest with username', async () => {
-      const mockUser = {
-        id: 'guest',
-        username: 'GuestUser',
-        email: '',
-        role: 'participant',
-        createdAt: new Date().toISOString()
-      };
-      vi.mocked(AuthService.postAuthGuest).mockResolvedValue(mockUser as any);
-
-      const user = await api.auth.guestJoin('GuestUser');
-
-      expect(user.username).toBe('GuestUser');
-      expect(user.role).toBe('participant');
-    });
   });
 
   describe('Session Management', () => {
@@ -144,7 +128,7 @@ describe('API Module', () => {
         participants: [{ id: '1', username: 'host' }],
         createdAt: new Date().toISOString()
       };
-      vi.mocked(SessionsService.postSessions).mockResolvedValue(mockSession as any);
+      vi.mocked(SessionsService.postSessions).mockResolvedValue(mockSession as unknown as Awaited<ReturnType<typeof SessionsService.postSessions>>);
 
       const session = await api.sessions.create('Interview Session', 'javascript');
 
@@ -157,7 +141,7 @@ describe('API Module', () => {
 
     it('should get session by id', async () => {
       const mockSession = { id: 'sess1', title: 'Test Session', createdAt: new Date().toISOString() };
-      vi.mocked(SessionsService.getSessions1).mockResolvedValue(mockSession as any);
+      vi.mocked(SessionsService.getSessionsPrivate).mockResolvedValue(mockSession as unknown as Awaited<ReturnType<typeof SessionsService.getSessionsPrivate>>);
 
       const fetched = await api.sessions.get('sess1');
 
@@ -166,25 +150,25 @@ describe('API Module', () => {
     });
 
     it('should return null for non-existent session', async () => {
-      vi.mocked(SessionsService.getSessions1).mockRejectedValue(new Error('Not found'));
+      vi.mocked(SessionsService.getSessionsPrivate).mockRejectedValue(Object.assign(new Error('Not found'), { status: 404 }));
       const session = await api.sessions.get('non-existent-id');
       expect(session).toBeNull();
     });
 
     it('should update session code', async () => {
-      vi.mocked(SessionsService.putSessionsCode).mockResolvedValue(undefined as any);
+      vi.mocked(SessionsService.putSessionsCode).mockResolvedValue(undefined);
       await api.sessions.updateCode('id', 'const x = 42;');
       expect(SessionsService.putSessionsCode).toHaveBeenCalledWith('id', { code: 'const x = 42;' });
     });
 
     it('should update session language', async () => {
-      vi.mocked(SessionsService.putSessionsLanguage).mockResolvedValue(undefined as any);
+      vi.mocked(SessionsService.putSessionsLanguage).mockResolvedValue(undefined);
       await api.sessions.updateLanguage('id', 'python');
       expect(SessionsService.putSessionsLanguage).toHaveBeenCalledWith('id', { language: 'python' });
     });
 
     it('should end a session', async () => {
-      vi.mocked(SessionsService.postSessionsEnd).mockResolvedValue(undefined as any);
+      vi.mocked(SessionsService.postSessionsEnd).mockResolvedValue(undefined);
       await api.sessions.end('id');
       expect(SessionsService.postSessionsEnd).toHaveBeenCalledWith('id');
     });
@@ -194,7 +178,7 @@ describe('API Module', () => {
         { id: '1', title: 'Active 1', status: 'active', createdAt: new Date().toISOString() },
         { id: '2', title: 'Active 2', status: 'active', createdAt: new Date().toISOString() }
       ];
-      vi.mocked(SessionsService.getSessions).mockResolvedValue(mockSessions as any);
+      vi.mocked(SessionsService.getSessions).mockResolvedValue(mockSessions as unknown as Awaited<ReturnType<typeof SessionsService.getSessions>>);
 
       const active = await api.sessions.getActive();
       expect(active.length).toBe(2);
@@ -223,21 +207,22 @@ describe('API Module', () => {
   });
 
   describe('Code Execution', () => {
-    it('should execute JavaScript code', async () => {
+  it('should report that collaborative execution is disabled', async () => {
       const mockResult = { stdout: 'hello', exitCode: 0, executionTime: 10 };
-      vi.mocked(ExecutionService.postExecutionRun).mockResolvedValue(mockResult as any);
+      vi.mocked(ExecutionService.postExecutionRun).mockResolvedValue(mockResult as unknown as Awaited<ReturnType<typeof ExecutionService.postExecutionRun>>);
 
       const result = await api.execution.run('console.log("hello")', 'javascript');
 
-      expect(result.stdout).toBe('hello');
-      expect(result.exitCode).toBe(0);
+    expect(result.stdout).toBe('');
+    expect(result.stderr).toContain('fully isolated runtime');
+    expect(result.exitCode).toBe(1);
     });
   });
 
   describe('Chat', () => {
     it('should send and retrieve chat messages', async () => {
       const mockMsg = { id: 'm1', message: 'Hello!', timestamp: new Date().toISOString() };
-      vi.mocked(ChatService.postSessionsMessages).mockResolvedValue(mockMsg as any);
+      vi.mocked(ChatService.postSessionsMessages).mockResolvedValue(mockMsg as unknown as Awaited<ReturnType<typeof ChatService.postSessionsMessages>>);
 
       await api.chat.send('s1', 'Hello!');
       expect(ChatService.postSessionsMessages).toHaveBeenCalledWith('s1', { message: 'Hello!' });
@@ -245,7 +230,7 @@ describe('API Module', () => {
 
     it('should get messages', async () => {
       const mockMsgs = [{ id: 'm1', message: 'Hello!', timestamp: new Date().toISOString() }];
-      vi.mocked(ChatService.getSessionsMessages).mockResolvedValue(mockMsgs as any);
+      vi.mocked(ChatService.getSessionsMessages).mockResolvedValue(mockMsgs as unknown as Awaited<ReturnType<typeof ChatService.getSessionsMessages>>);
 
       const msgs = await api.chat.getMessages('s1');
       expect(msgs.length).toBe(1);

@@ -4,10 +4,10 @@
 /* eslint-disable */
 import type { TestResult } from './TestResult';
 export type ExecutionResult = {
-    stdout?: string;
-    stderr?: string;
-    exitCode?: number;
-    executionTime?: number;
-    testResults?: Array<TestResult>;
+    executionTime: number;
+    exitCode: number;
+    stderr: string;
+    stdout: string;
+    testResults?: (Array<TestResult> | null);
 };
 

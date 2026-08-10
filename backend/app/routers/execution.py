@@ -1,8 +1,8 @@
 """
 Code Execution Router - DISABLED FOR SECURITY
 
-Code execution now happens client-side via WebAssembly (Pyodide).
-These endpoints are kept for API compatibility but return 503.
+These endpoints are kept for API compatibility but return 503. No browser or
+server-side interpreter is loaded by this application.
 """
 from fastapi import APIRouter, HTTPException
 from ..models.execution import ExecutionRequest, TestRequest, ExecutionResult
@@ -14,11 +14,11 @@ router = APIRouter(prefix="/execution", tags=["Execution"])
 def run_code(body: ExecutionRequest):
     """
     Code execution is disabled on the server for security reasons.
-    Please use the browser-based code execution (WebAssembly).
+    An isolated execution service is required before code can run.
     """
     raise HTTPException(
         status_code=503,
-        detail="Server-side code execution is disabled for security. Code runs in your browser instead."
+        detail="Code execution is disabled until an isolated runtime is available."
     )
 
 
@@ -26,9 +26,9 @@ def run_code(body: ExecutionRequest):
 def run_tests(body: TestRequest):
     """
     Test execution is disabled on the server for security reasons.
-    Please use the browser-based test execution (WebAssembly).
+    An isolated execution service is required before tests can run.
     """
     raise HTTPException(
         status_code=503,
-        detail="Server-side test execution is disabled for security. Tests run in your browser instead."
+        detail="Test execution is disabled until an isolated runtime is available."
     )

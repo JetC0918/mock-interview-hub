@@ -17,11 +17,12 @@ def mock_ai_service():
 def test_ai_assist_endpoint_success(client: TestClient, mock_ai_service):
     # Authenticate
     client.post("/auth/signup", json={"username": "ai_user", "email": "ai@example.com", "password": "password"})
+    session_id = client.post("/sessions/", json={"title": "AI test", "language": "python"}).json()["id"]
     
     response = client.post(
         "/ai/assist",
         json={
-            "sessionId": "test-session-id",
+            "sessionId": session_id,
             "message": "@AI How do I solve this?",
             "problemContext": {
                 "title": "Two Sum",
@@ -46,11 +47,12 @@ def test_ai_assist_endpoint_success(client: TestClient, mock_ai_service):
 def test_ai_assist_missing_message(client: TestClient, mock_ai_service):
     # Authenticate
     client.post("/auth/signup", json={"username": "ai_user_2", "email": "ai2@example.com", "password": "password"})
+    session_id = client.post("/sessions/", json={"title": "AI test", "language": "python"}).json()["id"]
     
     response = client.post(
         "/ai/assist",
         json={
-            "sessionId": "test-session-id",
+            "sessionId": session_id,
             "message": "@AI"  # Empty message after tag
         }
     )
@@ -61,6 +63,7 @@ def test_ai_assist_missing_message(client: TestClient, mock_ai_service):
 def test_ai_assist_no_tag(client: TestClient, mock_ai_service):
     # Authenticate
     client.post("/auth/signup", json={"username": "ai_user_3", "email": "ai3@example.com", "password": "password"})
+    session_id = client.post("/sessions/", json={"title": "AI test", "language": "python"}).json()["id"]
     
     # Even without tag, if the frontend sends it to this endpoint, it should work
     # The endpoint strips @AI but does not strictly enforce its presence
@@ -69,7 +72,7 @@ def test_ai_assist_no_tag(client: TestClient, mock_ai_service):
     response = client.post(
         "/ai/assist",
         json={
-            "sessionId": "test-session-id",
+            "sessionId": session_id,
             "message": "Just a normal message"
         }
     )
@@ -81,12 +84,13 @@ def test_ai_assist_no_tag(client: TestClient, mock_ai_service):
 def test_ai_service_not_configured(client: TestClient):
     # Authenticate
     client.post("/auth/signup", json={"username": "ai_user_4", "email": "ai4@example.com", "password": "password"})
+    session_id = client.post("/sessions/", json={"title": "AI test", "language": "python"}).json()["id"]
     
-    with patch("app.routers.ai.get_ai_service", side_effect=ValueError("GEMINI_API_KEY environment variable is not set")):
+    with patch("app.routers.ai.get_ai_service", side_effect=ValueError("DEEPSEEK_API_KEY environment variable is not set")):
         response = client.post(
             "/ai/assist",
             json={
-                "sessionId": "test-session-id",
+                "sessionId": session_id,
                 "message": "@AI help"
             }
         )

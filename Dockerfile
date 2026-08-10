@@ -47,12 +47,15 @@ RUN uv sync --frozen --no-dev
 
 # Copy backend application code
 COPY backend/app/ ./app/
+COPY backend/migrations/ /app/backend/migrations/
+COPY backend/alembic.ini /app/backend/alembic.ini
 
 # Copy frontend built assets to nginx html directory
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
+COPY --from=frontend-builder /app/node_modules/monaco-editor/min/vs /usr/share/nginx/html/monaco/vs
 
 # Copy nginx configuration
-COPY nginx.combined.conf /etc/nginx/conf.d/default.conf
+COPY nginx.combined.conf /etc/nginx/conf.d/default.template.conf
 
 # Remove default nginx site configuration
 RUN rm -f /etc/nginx/sites-enabled/default
@@ -64,4 +67,7 @@ COPY supervisord.conf /etc/supervisor/conf.d/supervisord.conf
 EXPOSE 80
 
 # Start supervisord which manages nginx and the backend
-CMD ["supervisord", "-c", "/etc/supervisor/conf.d/supervisord.conf"]
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod 0755 /usr/local/bin/docker-entrypoint.sh
+
+CMD ["/usr/local/bin/docker-entrypoint.sh"]

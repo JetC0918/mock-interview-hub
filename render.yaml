@@ -1,37 +1,32 @@
-# Render Blueprint - Infrastructure as Code
-# https://docs.render.com/blueprint-spec
-
-databases:
-  - name: mock-interview-db
-    databaseName: codiolive
-    user: codiolive
-    plan: free  # Change to 'starter' ($7/mo) for production
-
 services:
-  # FastAPI Backend
   - type: web
-    name: mock-interview-backend
+    name: mock-interview-hub
     runtime: docker
-    dockerfilePath: ./backend/Dockerfile
-    dockerContext: ./backend
-    plan: free  # Change to 'starter' ($7/mo) for production
-    healthCheckPath: /health
+    region: singapore
+    plan: starter
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    preDeployCommand: "uv run alembic -c /app/backend/alembic.ini upgrade head"
+    healthCheckPath: /api/health
+    autoDeployTrigger: checksPass
     envVars:
+      - key: APP_ENV
+        value: production
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: SEED_DEMO_DATA
+        value: "false"
       - key: DATABASE_URL
         fromDatabase:
           name: mock-interview-db
           property: connectionString
-      - key: SECRET_KEY
-        generateValue: true
-      - key: PYTHONUNBUFFERED
-        value: "1"
-      - key: GEMINI_API_KEY
+      - key: DEEPSEEK_API_KEY
         sync: false
+      - key: IDEMPOTENCY_SECRET
+        generateValue: true
 
-  # React Frontend with Nginx
-  - type: web
-    name: mock-interview-frontend
-    runtime: docker
-    dockerfilePath: ./frontend/Dockerfile.render
-    dockerContext: ./frontend
-    plan: free  # Change to 'starter' ($7/mo) for production
+databases:
+  - name: mock-interview-db
+    region: singapore
+    plan: basic-256mb
+    ipAllowList: []

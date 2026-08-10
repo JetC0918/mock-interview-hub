@@ -28,7 +28,7 @@ class TestSessionIntegration:
         assert session["status"] == "waiting"
         assert "id" in session
         assert "pin" in session
-        assert len(session["pin"]) == 4  # PIN should be 4 digits
+        assert len(session["pin"]) >= 32
 
     def test_get_session_by_id(self, client: TestClient):
         """Test retrieving a session by ID."""
@@ -102,10 +102,10 @@ class TestSessionIntegration:
         session_id = create_response.json()["id"]
         
         # Try to join with wrong PIN
-        response = client.post(f"/sessions/{session_id}/join", json={"pin": "9999"})
-        
+        response = client.post(f"/sessions/{session_id}/join", json={"pin": "x" * 8})
+
         assert response.status_code == 403
-        assert "invalid pin" in response.json()["detail"].lower()
+        assert "invalid session join secret" in response.json()["detail"].lower()
 
     def test_update_session_code(self, client: TestClient):
         """Test updating code in a session."""

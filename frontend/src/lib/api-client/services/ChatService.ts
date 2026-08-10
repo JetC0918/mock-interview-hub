@@ -1,50 +1,17 @@
-/* generated using openapi-typescript-codegen -- do not edit */
-/* istanbul ignore file */
-/* tslint:disable */
-/* eslint-disable */
-import type { ChatMessage } from '../models/ChatMessage';
+/* Compatibility facade for older frontend imports.
+ * Chat endpoints are now generated under SessionsService because they share
+ * the /sessions/{id} resource. */
 import type { CancelablePromise } from '../core/CancelablePromise';
-import { OpenAPI } from '../core/OpenAPI';
-import { request as __request } from '../core/request';
+import type { ChatMessage } from '../models/ChatMessage';
+import type { ChatMessageCreate } from '../models/ChatMessageCreate';
+import { SessionsService } from './SessionsService';
+
 export class ChatService {
-    /**
-     * Get chat messages
-     * @param id
-     * @returns ChatMessage List of messages
-     * @throws ApiError
-     */
-    public static getSessionsMessages(
-        id: string,
-    ): CancelablePromise<Array<ChatMessage>> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/sessions/{id}/messages',
-            path: {
-                'id': id,
-            },
-        });
+    public static postSessionsMessages(id: string, requestBody: ChatMessageCreate): CancelablePromise<ChatMessage> {
+        return SessionsService.sendMessageSessionsIdMessagesPost({ id, requestBody });
     }
-    /**
-     * Send a chat message
-     * @param id
-     * @param requestBody
-     * @returns ChatMessage Message sent
-     * @throws ApiError
-     */
-    public static postSessionsMessages(
-        id: string,
-        requestBody: {
-            message: string;
-        },
-    ): CancelablePromise<ChatMessage> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/sessions/{id}/messages',
-            path: {
-                'id': id,
-            },
-            body: requestBody,
-            mediaType: 'application/json',
-        });
+
+    public static getSessionsMessages(id: string): CancelablePromise<Array<ChatMessage>> {
+        return SessionsService.getMessagesSessionsIdMessagesGet({ id });
     }
 }

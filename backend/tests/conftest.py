@@ -1,3 +1,5 @@
+import os
+os.environ["APP_ENV"] = "test"
 import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import create_engine, event

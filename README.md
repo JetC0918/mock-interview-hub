@@ -12,7 +12,7 @@ A real-time collaborative coding interview platform where interviewers and candi
 - **Real-time Collaboration** - Multiple users edit code together with live cursor tracking
 - **In-Browser Execution** - Run JavaScript and Python directly in the browser via WebAssembly (no server needed)
 - **AI Assistant** - Type `@AI` in chat to get help with problem-solving approaches
-- **PIN-based Joining** - Share a simple PIN to let participants join your session
+- **Secure Session Joining** - Share an expiring high-entropy join secret to let participants join your session
 - **Guest Access** - Join sessions without creating an account
 - **Monaco Editor** - Full-featured code editor with syntax highlighting
 - **Problem Challenges** - Built-in coding problems (Two Sum, Reverse String, etc.)
@@ -24,7 +24,7 @@ A real-time collaborative coding interview platform where interviewers and candi
 | **Frontend** | React, TypeScript, Vite, TailwindCSS, shadcn/ui, Monaco Editor |
 | **Backend** | FastAPI, SQLAlchemy, bcrypt, Pydantic |
 | **Database** | SQLite (dev) / PostgreSQL (prod) |
-| **AI** | Google Gemini API |
+| **AI** | DeepSeek V4 Flash API |
 | **Package Managers** | npm (frontend), uv (backend) |
 
 ## Quick Start
@@ -53,7 +53,7 @@ npm install              # Install frontend dependencies
 
 Create a `.env` file in the project root:
 ```env
-GEMINI_API_KEY=your_gemini_api_key_here
+DEEPSEEK_API_KEY=your_deepseek_api_key_here
 ```
 
 ### 4. Run Development Servers
@@ -81,7 +81,7 @@ docker compose up
 ```
 
 This starts:
-- PostgreSQL database on port 5432
+- PostgreSQL database on the internal Compose network (not published to the host)
 - FastAPI backend on port 8000
 - React frontend on port 8080
 
@@ -161,16 +161,14 @@ cd frontend
 npm run test
 ```
 
-## Default Users (Development)
+## Demo data (development only)
 
-The database is seeded with test accounts:
+Demo users and sample sessions are disabled by default. To opt in locally, set
+`SEED_DEMO_DATA=true`; never enable it on an Internet-facing deployment because
+the demo accounts use deterministic development passwords.
 
-| Email | Username | Password |
-|-------|----------|----------|
-| host@example.com | CodeMaster | password |
-| dev@example.com | Pythonista | password |
-| algo@example.com | AlgoGuru | password |
-| frontend@example.com | FrontEndFan | password |
+Compose requires `POSTGRES_PASSWORD` to be supplied from a local secret store or
+shell environment. PostgreSQL is intentionally not published to the host.
 
 ## License
 

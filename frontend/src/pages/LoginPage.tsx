@@ -8,6 +8,9 @@ import { Label } from '@/components/ui/label';
 import { Code2, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+const getErrorMessage = (error: unknown, fallback: string) =>
+  error instanceof Error ? error.message : fallback;
+
 const LoginPage: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -27,10 +30,10 @@ const LoginPage: React.FC = () => {
         description: 'You have successfully signed in.',
       });
       navigate('/lobby');
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Error',
-        description: error.message || 'Failed to sign in',
+        description: getErrorMessage(error, 'Failed to sign in'),
         variant: 'destructive',
       });
     } finally {

@@ -1,6 +1,5 @@
 from enum import Enum
-from pydantic import BaseModel
-from typing import List, Optional
+from pydantic import BaseModel, Field
 
 class SupportedLanguage(str, Enum):
     JAVASCRIPT = "javascript"
@@ -16,5 +15,5 @@ class Role(str, Enum):
     SPECTATOR = "spectator"
 
 class CursorPosition(BaseModel):
-    line: int
-    column: int
+    line: int = Field(ge=1, le=100_000)
+    column: int = Field(ge=1, le=100_000)

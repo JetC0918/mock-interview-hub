@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api, Session } from '@/lib/api';
 import Header from '@/components/Header';
@@ -6,82 +6,43 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Eye, Users, Code2, Clock, Play, Loader2 } from 'lucide-react';
+import { demoLiveSessions } from '@/data/liveSessions';
 
 const SpectatePage: React.FC = () => {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const requestGeneration = useRef(0);
   const navigate = useNavigate();
   const languages = api.utils.getSupportedLanguages();
+  const allowDemo = import.meta.env.DEV && new URLSearchParams(window.location.search).get('demo') === '1';
 
-  useEffect(() => {
-    loadSessions();
-    
-    // Refresh periodically
-    const interval = setInterval(loadSessions, 10000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const loadSessions = async () => {
+  const loadSessions = useCallback(async () => {
+    const generation = ++requestGeneration.current;
     try {
       const activeSessions = await api.spectator.getSessions();
-      // Add mock active sessions for demo
-      const mockSessions: Session[] = [
-        {
-          id: 'live-1',
-          pin: '789456',
-          hostId: 'host-1',
-          title: 'Senior Frontend Interview',
-          description: '',
-          language: 'typescript',
-          participants: [
-            { id: 'p1', username: 'interviewer_jane', role: 'host', color: 'hsl(174 72% 50%)', joinedAt: new Date() },
-            { id: 'p2', username: 'candidate_mike', role: 'participant', color: 'hsl(265 70% 60%)', joinedAt: new Date() },
-          ],
-          code: '',
-          status: 'active',
-          createdAt: new Date(Date.now() - 1800000),
-        },
-        {
-          id: 'live-2',
-          pin: '321654',
-          hostId: 'host-2',
-          title: 'Algorithm Challenge',
-          description: '',
-          language: 'python',
-          participants: [
-            { id: 'p3', username: 'coach_sara', role: 'host', color: 'hsl(174 72% 50%)', joinedAt: new Date() },
-            { id: 'p4', username: 'student_alex', role: 'participant', color: 'hsl(38 92% 50%)', joinedAt: new Date() },
-            { id: 'p5', username: 'student_emma', role: 'participant', color: 'hsl(330 80% 60%)', joinedAt: new Date() },
-          ],
-          code: '',
-          status: 'active',
-          createdAt: new Date(Date.now() - 2700000),
-        },
-        {
-          id: 'live-3',
-          pin: '654987',
-          hostId: 'host-3',
-          title: 'Bootcamp Live Session',
-          description: '',
-          language: 'javascript',
-          participants: [
-            { id: 'p6', username: 'instructor', role: 'host', color: 'hsl(174 72% 50%)', joinedAt: new Date() },
-            { id: 'p7', username: 'student_1', role: 'participant', color: 'hsl(265 70% 60%)', joinedAt: new Date() },
-            { id: 'p8', username: 'student_2', role: 'participant', color: 'hsl(38 92% 50%)', joinedAt: new Date() },
-            { id: 'p9', username: 'student_3', role: 'participant', color: 'hsl(330 80% 60%)', joinedAt: new Date() },
-          ],
-          code: '',
-          status: 'active',
-          createdAt: new Date(Date.now() - 900000),
-        },
-      ];
-      setSessions([...activeSessions, ...mockSessions]);
+      if (generation !== requestGeneration.current) return;
+      const activeIds = new Set(activeSessions.map((session) => session.id));
+      setSessions([
+        ...activeSessions,
+        ...(allowDemo ? demoLiveSessions.filter((session) => !activeIds.has(session.id)) : []),
+      ]);
+      setLoadError(null);
     } catch (error) {
-      console.error('Failed to load sessions:', error);
+      if (generation === requestGeneration.current) {
+        setLoadError(error instanceof Error ? error.message : 'Live sessions are temporarily unavailable.');
+        setSessions([]);
+      }
     } finally {
-      setIsLoading(false);
+      if (generation === requestGeneration.current) setIsLoading(false);
     }
-  };
+  }, [allowDemo]);
+
+  useEffect(() => {
+    void loadSessions();
+    const interval = setInterval(() => void loadSessions(), 10000);
+    return () => clearInterval(interval);
+  }, [loadSessions]);
 
   const getTimeSince = (date: Date) => {
     const minutes = Math.floor((Date.now() - new Date(date).getTime()) / 60000);
@@ -106,6 +67,14 @@ const SpectatePage: React.FC = () => {
           <div className="flex justify-center py-12">
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
+        ) : loadError ? (
+          <Card className="text-center py-12 max-w-md mx-auto border-destructive/40">
+            <CardContent>
+              <h3 className="text-lg font-semibold mb-2">Live sessions unavailable</h3>
+              <p className="text-muted-foreground mb-4">{loadError}</p>
+              <Button variant="outline" onClick={() => void loadSessions()}>Retry</Button>
+            </CardContent>
+          </Card>
         ) : sessions.length === 0 ? (
           <Card className="text-center py-12 max-w-md mx-auto">
             <CardContent>
@@ -133,7 +102,7 @@ const SpectatePage: React.FC = () => {
                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-destructive opacity-75" />
                     <span className="relative inline-flex rounded-full h-3 w-3 bg-destructive" />
                   </span>
-                  <span className="text-xs font-medium text-destructive">LIVE</span>
+                  <span className="text-xs font-medium text-destructive">{session.status === 'active' ? 'LIVE' : session.status.toUpperCase()}</span>
                 </div>
 
                 <CardHeader className="pb-3">
@@ -183,14 +152,14 @@ const SpectatePage: React.FC = () => {
                     </div>
                     <div className="flex items-center gap-1 text-sm text-muted-foreground">
                       <Eye className="h-4 w-4" />
-                      <span>{Math.floor(Math.random() * 50) + 5} watching</span>
+                      <span>{session.id === 'live-1' ? 24 : session.id === 'live-2' ? 17 : 31} watching</span>
                     </div>
                   </div>
 
                   <Button
-                    className="w-full mt-4 opacity-0 group-hover:opacity-100 transition-opacity"
+                    className="w-full mt-4 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity"
                     variant="hero"
-                    onClick={() => navigate(`/session/${session.id}`)}
+                    onClick={() => navigate(`/spectate/${session.id}`)}
                   >
                     <Play className="h-4 w-4 mr-2" />
                     Watch Session

@@ -3,96 +3,103 @@
 /* tslint:disable */
 /* eslint-disable */
 import type { User } from '../models/User';
+import type { UserCreate } from '../models/UserCreate';
+import type { UserLogin } from '../models/UserLogin';
 import type { CancelablePromise } from '../core/CancelablePromise';
 import { OpenAPI } from '../core/OpenAPI';
 import { request as __request } from '../core/request';
 export class AuthService {
+    /** Backwards-compatible aliases retained for existing frontend adapters. */
+    public static postAuthLogin(requestBody: import('../models/UserLogin').UserLogin): CancelablePromise<import('../models/User').User> {
+        return this.loginAuthLoginPost({ requestBody });
+    }
+    public static postAuthSignup(requestBody: import('../models/UserCreate').UserCreate): CancelablePromise<import('../models/User').User> {
+        return this.signupAuthSignupPost({ requestBody });
+    }
+    public static postAuthLogout(): CancelablePromise<any> {
+        return this.logoutAuthLogoutPost({ sessionToken: undefined });
+    }
+    public static getAuthMe(): CancelablePromise<import('../models/User').User> {
+        return this.getCurrentUserAuthMeGet();
+    }
+    public static postAuthGuest(requestBody: { username: string }): CancelablePromise<import('../models/User').User> {
+        void requestBody;
+        throw new Error('Standalone guest identity creation is disabled; use session guest admission.');
+    }
     /**
-     * Login user
-     * @param requestBody
-     * @returns User Successful login
+     * Login
+     * Login with email and password.
+     * @returns User Successful Response
      * @throws ApiError
      */
-    public static postAuthLogin(
-        requestBody: {
-            email: string;
-            password: string;
-        },
-    ): CancelablePromise<User> {
+    public static loginAuthLoginPost({
+        requestBody,
+    }: {
+        requestBody: UserLogin,
+    }): CancelablePromise<User> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/auth/login',
             body: requestBody,
             mediaType: 'application/json',
             errors: {
-                401: `Invalid credentials`,
+                422: `Validation Error`,
             },
         });
     }
     /**
-     * Register new user
-     * @param requestBody
-     * @returns User User created
+     * Logout
+     * Revoke and clear the current session cookie.
+     * @returns any Successful Response
      * @throws ApiError
      */
-    public static postAuthSignup(
-        requestBody: {
-            username: string;
-            email: string;
-            password: string;
-        },
-    ): CancelablePromise<User> {
+    public static logoutAuthLogoutPost({
+        sessionToken,
+    }: {
+        sessionToken?: (string | null),
+    }): CancelablePromise<any> {
+        return __request(OpenAPI, {
+            method: 'POST',
+            url: '/auth/logout',
+            cookies: {
+                'session_token': sessionToken,
+            },
+            errors: {
+                422: `Validation Error`,
+            },
+        });
+    }
+    /**
+     * Get Current User
+     * Get the current authenticated user.
+     * @returns User Successful Response
+     * @throws ApiError
+     */
+    public static getCurrentUserAuthMeGet(): CancelablePromise<User> {
+        return __request(OpenAPI, {
+            method: 'GET',
+            url: '/auth/me',
+        });
+    }
+    /**
+     * Signup
+     * Create a new account.
+     * @returns User Successful Response
+     * @throws ApiError
+     */
+    public static signupAuthSignupPost({
+        requestBody,
+    }: {
+        requestBody: UserCreate,
+    }): CancelablePromise<User> {
         return __request(OpenAPI, {
             method: 'POST',
             url: '/auth/signup',
             body: requestBody,
             mediaType: 'application/json',
             errors: {
-                400: `Invalid input`,
+                422: `Validation Error`,
             },
-        });
-    }
-    /**
-     * Logout user
-     * @returns any Successfully logged out
-     * @throws ApiError
-     */
-    public static postAuthLogout(): CancelablePromise<any> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/auth/logout',
-        });
-    }
-    /**
-     * Get current authenticated user
-     * @returns User Current user
-     * @throws ApiError
-     */
-    public static getAuthMe(): CancelablePromise<User> {
-        return __request(OpenAPI, {
-            method: 'GET',
-            url: '/auth/me',
-            errors: {
-                401: `Not authenticated`,
-            },
-        });
-    }
-    /**
-     * Join as guest
-     * @param requestBody
-     * @returns User Guest user created
-     * @throws ApiError
-     */
-    public static postAuthGuest(
-        requestBody: {
-            username: string;
-        },
-    ): CancelablePromise<User> {
-        return __request(OpenAPI, {
-            method: 'POST',
-            url: '/auth/guest',
-            body: requestBody,
-            mediaType: 'application/json',
         });
     }
 }

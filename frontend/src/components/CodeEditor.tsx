@@ -1,6 +1,14 @@
 import React, { useRef, useEffect, useState } from 'react';
-import Editor, { OnMount } from '@monaco-editor/react';
+import Editor, { OnMount, loader } from '@monaco-editor/react';
+import type { Monaco } from '@monaco-editor/react';
+import type { editor as MonacoEditor } from 'monaco-editor';
 import { SupportedLanguage, Participant } from '@/lib/api';
+
+// Keep Monaco assets same-origin. The default loader points at jsDelivr,
+// which makes the editor dependent on a third-party CDN and violates the
+// production CSP/supply-chain boundary. The image copies this directory from
+// the pinned monaco-editor package into /monaco/vs.
+loader.config({ paths: { vs: '/monaco/vs' } });
 
 interface CodeEditorProps {
   code: string;
@@ -9,6 +17,7 @@ interface CodeEditorProps {
   participants: Participant[];
   currentUserId: string;
   readOnly?: boolean;
+  onCursorChange?: (position: { line: number; column: number }) => void;
 }
 
 const languageMap: Record<SupportedLanguage, string> = {
@@ -27,14 +36,36 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   participants,
   currentUserId,
   readOnly = false,
+  onCursorChange,
 }) => {
-  const editorRef = useRef<any>(null);
+  const editorRef = useRef<MonacoEditor.IStandaloneCodeEditor | null>(null);
+  const monacoRef = useRef<Monaco | null>(null);
   const decorationsRef = useRef<string[]>([]);
+  const cursorTimerRef = useRef<number | null>(null);
+  const cursorListenerRef = useRef<{ dispose: () => void } | null>(null);
+  const onCursorChangeRef = useRef(onCursorChange);
   const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    onCursorChangeRef.current = onCursorChange;
+  }, [onCursorChange]);
+
+  useEffect(() => () => {
+    if (cursorTimerRef.current !== null) window.clearTimeout(cursorTimerRef.current);
+    cursorListenerRef.current?.dispose();
+  }, []);
 
   const handleEditorDidMount: OnMount = (editor, monaco) => {
     editorRef.current = editor;
     setIsLoaded(true);
+    monacoRef.current = monaco;
+    cursorListenerRef.current = editor.onDidChangeCursorPosition(({ position }: MonacoEditor.ICursorPositionChangedEvent) => {
+      if (!onCursorChangeRef.current) return;
+      if (cursorTimerRef.current !== null) window.clearTimeout(cursorTimerRef.current);
+      cursorTimerRef.current = window.setTimeout(() => {
+        onCursorChangeRef.current?.({ line: position.lineNumber, column: position.column });
+      }, 250);
+    });
 
     // Define custom theme
     monaco.editor.defineTheme('codiolive', {
@@ -85,25 +116,26 @@ const CodeEditor: React.FC<CodeEditorProps> = ({
   useEffect(() => {
     if (!editorRef.current || !isLoaded) return;
 
-    const monaco = (window as any).monaco;
+    const monaco = monacoRef.current;
     if (!monaco) return;
 
     const newDecorations = participants
       .filter((p) => p.id !== currentUserId && p.cursorPosition)
-      .map((participant) => ({
-        range: new monaco.Range(
-          participant.cursorPosition!.line,
-          participant.cursorPosition!.column,
-          participant.cursorPosition!.line,
-          participant.cursorPosition!.column + 1
-        ),
-        options: {
-          className: `remote-cursor-${participants.indexOf(participant) + 1}`,
-          beforeContentClassName: 'remote-cursor-marker',
-          hoverMessage: { value: participant.username },
-          stickiness: 1,
-        },
-      }));
+      .map((participant) => {
+        // Monaco uses one-based positions; clamp untrusted/stale data before
+        // constructing a Range so one malformed cursor cannot break rendering.
+        const line = Math.max(1, participant.cursorPosition!.line || 1);
+        const column = Math.max(1, participant.cursorPosition!.column || 1);
+        return {
+          range: new monaco.Range(line, column, line, column + 1),
+          options: {
+            className: `remote-cursor-${participants.indexOf(participant) + 1}`,
+            beforeContentClassName: 'remote-cursor-marker',
+            hoverMessage: { value: participant.username },
+            stickiness: 1,
+          },
+        };
+      });
 
     decorationsRef.current = editorRef.current.deltaDecorations(
       decorationsRef.current,
