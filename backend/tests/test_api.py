@@ -22,12 +22,9 @@ def test_auth_workflow(client: TestClient):
     logged_in_user = response.json()
     assert logged_in_user["id"] == user["id"]
 
-    # Guest Login
-    guest_data = {"username": "GuestUser"}
-    response = client.post("/auth/guest", json=guest_data)
-    assert response.status_code == 201
-    guest = response.json()
-    assert guest["username"] == "GuestUser"
+    # Guest identities cannot be created outside validated session admission.
+    response = client.post("/auth/guest", json={"username": "GuestUser"})
+    assert response.status_code == 404
 
 
 def test_auth_cookie_is_opaque_and_revocable(client: TestClient):
@@ -70,7 +67,11 @@ def test_session_workflow(client: TestClient):
 
     # Join Session
     # Need new user
-    client.post("/auth/signup", json={"username": "participant", "email": "p@example.com", "password": "pw"})
+    response = client.post(
+        "/auth/signup",
+        json={"username": "participant", "email": "p@example.com", "password": "password123"},
+    )
+    assert response.status_code == 201
     
     join_data = {"pin": session["pin"]}
     response = client.post(f"/sessions/{session_id}/join", json=join_data)
@@ -93,7 +94,10 @@ def test_ended_session_rejects_mutations(client: TestClient):
     session = client.post("/sessions/", json={"title": "Ended", "language": "python"}).json()
     session_id = session["id"]
     assert client.post(f"/sessions/{session_id}/end").status_code == 200
-    assert client.put(f"/sessions/{session_id}/code", json={"code": "bad"}).status_code == 410
+    assert client.put(
+        f"/sessions/{session_id}/code",
+        json={"code": "bad", "baseRevision": session["codeRevision"]},
+    ).status_code == 410
     assert client.post("/sessions/join-by-pin", json={"pin": session["pin"]}).status_code == 410
 
 
@@ -107,7 +111,7 @@ def test_host_can_rotate_join_secret(client: TestClient):
     assert response.status_code == 200
     new_secret = response.json()["pin"]
     assert new_secret != old_secret
-    assert client.post("/sessions/join-by-pin", json={"pin": old_secret}).status_code == 404
+    assert client.post("/sessions/join-by-pin", json={"pin": old_secret}).status_code == 403
 
 def test_execution(client: TestClient):
     # Run Code

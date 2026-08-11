@@ -125,7 +125,8 @@ describe('API Module', () => {
         language: 'javascript',
         pin: '123456',
         status: 'waiting',
-        participants: [{ id: '1', username: 'host' }],
+        codeRevision: 0,
+        participants: [{ id: '1', username: 'host', joinedAt: new Date().toISOString() }],
         createdAt: new Date().toISOString()
       };
       vi.mocked(SessionsService.postSessions).mockResolvedValue(mockSession as unknown as Awaited<ReturnType<typeof SessionsService.postSessions>>);
@@ -140,7 +141,7 @@ describe('API Module', () => {
     });
 
     it('should get session by id', async () => {
-      const mockSession = { id: 'sess1', title: 'Test Session', createdAt: new Date().toISOString() };
+      const mockSession = { id: 'sess1', title: 'Test Session', codeRevision: 0, createdAt: new Date().toISOString() };
       vi.mocked(SessionsService.getSessionsPrivate).mockResolvedValue(mockSession as unknown as Awaited<ReturnType<typeof SessionsService.getSessionsPrivate>>);
 
       const fetched = await api.sessions.get('sess1');

@@ -20,7 +20,7 @@ services:
         fromDatabase:
           name: mock-interview-db
           property: connectionString
-      - key: DEEPSEEK_API_KEY
+      - key: GEMINI_API_KEY
         sync: false
       - key: IDEMPOTENCY_SECRET
         generateValue: true

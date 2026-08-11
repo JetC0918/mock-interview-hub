@@ -24,6 +24,7 @@ def test_ai_assist_endpoint_success(client: TestClient, mock_ai_service):
         json={
             "sessionId": session_id,
             "message": "@AI How do I solve this?",
+            "requestId": "ai_success_request_01",
             "problemContext": {
                 "title": "Two Sum",
                 "difficulty": "easy",
@@ -53,12 +54,13 @@ def test_ai_assist_missing_message(client: TestClient, mock_ai_service):
         "/ai/assist",
         json={
             "sessionId": session_id,
-            "message": "@AI"  # Empty message after tag
+            "message": "@AI",  # Empty message after tag
+            "requestId": "ai_empty_request_01",
         }
     )
     
-    # Should return 400 because message is empty after stripping tag
-    assert response.status_code == 400
+    # Pydantic rejects a message that is empty after stripping the tag.
+    assert response.status_code == 422
 
 def test_ai_assist_no_tag(client: TestClient, mock_ai_service):
     # Authenticate
@@ -73,7 +75,8 @@ def test_ai_assist_no_tag(client: TestClient, mock_ai_service):
         "/ai/assist",
         json={
             "sessionId": session_id,
-            "message": "Just a normal message"
+            "message": "Just a normal message",
+            "requestId": "ai_plain_request_01",
         }
     )
     
@@ -86,12 +89,13 @@ def test_ai_service_not_configured(client: TestClient):
     client.post("/auth/signup", json={"username": "ai_user_4", "email": "ai4@example.com", "password": "password"})
     session_id = client.post("/sessions/", json={"title": "AI test", "language": "python"}).json()["id"]
     
-    with patch("app.routers.ai.get_ai_service", side_effect=ValueError("DEEPSEEK_API_KEY environment variable is not set")):
+    with patch("app.routers.ai.get_ai_service", side_effect=ValueError("GEMINI_API_KEY environment variable is not set")):
         response = client.post(
             "/ai/assist",
             json={
                 "sessionId": session_id,
-                "message": "@AI help"
+                "message": "@AI help",
+                "requestId": "ai_unconfigured_01",
             }
         )
         
