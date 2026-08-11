@@ -24,6 +24,13 @@ def client():
     from app.database.config import get_db, Base
     from app.database.service import seed_database
     from app.main import app
+    from app.utils.rate_limit import limiter
+
+    # The limiter is process-global, while every test gets a fresh database.
+    # Reset both so request history cannot leak between isolated test cases.
+    with limiter._lock:
+        limiter._windows.clear()
+        limiter._checks = 0
     
     # Import models to register them with Base  
     from app.database import models  # noqa: F401

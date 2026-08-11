@@ -1,5 +1,5 @@
 """
-AI Assistant Service using DeepSeek V4 Flash
+AI Assistant Service using Gemini 3.6 Flash
 
 This service provides AI-powered guidance to help users think through
 coding problems without giving direct solutions.
@@ -20,10 +20,10 @@ class AIProviderError(RuntimeError):
 
 
 class AIAssistantService:
-    """Service for AI-powered coding guidance using DeepSeek V4 Flash."""
+    """Service for AI-powered coding guidance using Gemini 3.6 Flash."""
 
-    API_URL = "https://api.deepseek.com/chat/completions"
-    MODEL_NAME = "deepseek-v4-flash"
+    MODEL_NAME = "gemini-3.6-flash"
+    API_URL = f"https://generativelanguage.googleapis.com/v1beta/models/{MODEL_NAME}:generateContent"
 
     SYSTEM_PROMPT = """You are a friendly and supportive coding mentor in a mock interview practice session. 
 Your role is to GUIDE users in thinking through problems, NOT to give them code or direct solutions.
@@ -45,9 +45,9 @@ Remember: Your goal is to help them LEARN, not to solve it for them."""
 
     def __init__(self):
         """Initialize the AI service with API key from environment."""
-        api_key = os.environ.get("DEEPSEEK_API_KEY")
+        api_key = os.environ.get("GEMINI_API_KEY")
         if not api_key:
-            raise ValueError("DEEPSEEK_API_KEY environment variable is not set")
+            raise ValueError("GEMINI_API_KEY environment variable is not set")
         
         self.api_key = api_key
 
@@ -98,18 +98,21 @@ Remember: Your goal is to help them LEARN, not to solve it for them."""
                         "POST",
                         self.API_URL,
                         headers={
-                            "Authorization": f"Bearer {self.api_key}",
+                            "x-goog-api-key": self.api_key,
                             "Content-Type": "application/json",
                         },
                         json={
-                            "model": self.MODEL_NAME,
-                            "messages": [
-                                {"role": "system", "content": self.SYSTEM_PROMPT},
-                                {"role": "user", "content": full_prompt},
-                            ],
-                            "thinking": {"type": "disabled"},
-                            "stream": False,
-                            "max_tokens": 1_000,
+                            "systemInstruction": {
+                                "parts": [{"text": self.SYSTEM_PROMPT}],
+                            },
+                            "contents": [{
+                                "role": "user",
+                                "parts": [{"text": full_prompt}],
+                            }],
+                            "generationConfig": {
+                                "maxOutputTokens": 1_000,
+                                "thinkingConfig": {"thinkingLevel": "minimal"},
+                            },
                         },
                     ) as response:
                         response.raise_for_status()
@@ -118,30 +121,33 @@ Remember: Your goal is to help them LEARN, not to solve it for them."""
                         async for chunk in response.aiter_bytes():
                             size += len(chunk)
                             if size > 65_536:
-                                raise ValueError("DeepSeek response exceeds the transport limit")
+                                raise ValueError("Gemini response exceeds the transport limit")
                             chunks.append(chunk)
             payload = json.loads(b"".join(chunks))
-            choice = payload["choices"][0]
-            if choice.get("finish_reason") != "stop":
-                raise ValueError("DeepSeek response did not finish normally")
-            content = choice["message"]["content"]
+            candidate = payload["candidates"][0]
+            if candidate.get("finishReason") != "STOP":
+                raise ValueError("Gemini response did not finish normally")
+            parts = candidate["content"]["parts"]
+            content = "".join(
+                part.get("text", "") for part in parts if isinstance(part, dict)
+            )
             if not isinstance(content, str) or not content.strip():
-                raise ValueError("DeepSeek returned an empty response")
+                raise ValueError("Gemini returned an empty response")
             content = content.strip()
             if len(content) > 8_000:
-                raise ValueError("DeepSeek response exceeds the transcript limit")
+                raise ValueError("Gemini response exceeds the transcript limit")
             return content
         except httpx.HTTPStatusError as error:
-            logging.error("DeepSeek AI request failed (%s)", type(error).__name__)
+            logging.error("Gemini AI request failed (%s)", type(error).__name__)
             raise AIProviderError(
                 "AI provider rejected the request", ambiguous=error.response.status_code >= 500,
             ) from error
         except (httpx.TimeoutException, httpx.NetworkError, TimeoutError, asyncio.TimeoutError) as error:
-            logging.error("DeepSeek AI request outcome is unknown (%s)", type(error).__name__)
+            logging.error("Gemini AI request outcome is unknown (%s)", type(error).__name__)
             raise AIProviderError("AI provider request outcome is unknown", ambiguous=True) from error
         except Exception as error:
             # Never log request headers, response bodies, or API key values.
-            logging.error("DeepSeek AI request failed (%s)", type(error).__name__)
+            logging.error("Gemini AI request failed (%s)", type(error).__name__)
             raise AIProviderError("AI provider response could not be verified", ambiguous=True) from error
 
 

@@ -28,7 +28,7 @@ services:
     container_name: mock-interview-app
     environment:
       DATABASE_URL: postgresql://codiolive:${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}@db:5432/codiolive
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
       APP_ENV: production
       COOKIE_SECURE: "true"
       SEED_DEMO_DATA: "false"

@@ -8,7 +8,40 @@ vi.mock('@/lib/api', () => ({
       getCurrentUser: vi.fn().mockResolvedValue(null),
     },
     spectator: {
-      watch: vi.fn().mockResolvedValue(null),
+      watch: vi.fn().mockResolvedValue({
+        id: 'live-1',
+        pin: '',
+        hostId: '',
+        title: 'Senior Frontend Interview',
+        description: 'Live coding interview',
+        language: 'typescript',
+        participants: [{
+          id: 'participant-1',
+          username: 'Maya',
+          role: 'host',
+          color: '#2563eb',
+          joinedAt: new Date('2026-08-10T05:00:00Z'),
+        }],
+        code: 'function mergeIntervals() {}',
+        codeRevision: 1,
+        status: 'active',
+        createdAt: new Date('2026-08-10T05:00:00Z'),
+        problem: {
+          id: 'problem-1',
+          title: 'Merge Intervals',
+          description: 'Merge all overlapping intervals.',
+          examples: [],
+          constraints: [],
+          difficulty: 'medium',
+        },
+      }),
+      getMessages: vi.fn().mockResolvedValue([{
+        id: 'message-1',
+        participantId: 'participant-1',
+        username: 'Maya',
+        message: 'Can you walk me through the complexity?',
+        timestamp: new Date('2026-08-10T05:01:00Z'),
+      }]),
     },
     utils: {
       getSupportedLanguages: () => [
@@ -19,6 +52,7 @@ vi.mock('@/lib/api', () => ({
 }));
 
 vi.mock('@monaco-editor/react', () => ({
+  loader: { config: vi.fn() },
   default: ({ value, options }: { value: string; options?: { readOnly?: boolean } }) => (
     <textarea aria-label="Live code" value={value} readOnly={options?.readOnly} />
   ),
