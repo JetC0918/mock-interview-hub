@@ -36,7 +36,7 @@ class TestSessionIntegration:
         client.post("/auth/signup", json={
             "username": "gethost",
             "email": "gethost@example.com",
-            "password": "pass"
+            "password": "password123"
         })
         create_response = client.post("/sessions/", json={
             "title": "Get Test Session",
@@ -63,7 +63,7 @@ class TestSessionIntegration:
         client.post("/auth/signup", json={
             "username": "joinhost",
             "email": "joinhost@example.com",
-            "password": "pass"
+            "password": "password123"
         })
         create_response = client.post("/sessions/", json={
             "title": "Join Test Session",
@@ -77,7 +77,7 @@ class TestSessionIntegration:
         client.post("/auth/signup", json={
             "username": "participant",
             "email": "participant@example.com",
-            "password": "pass"
+            "password": "password123"
         })
         
         # Join the session
@@ -93,7 +93,7 @@ class TestSessionIntegration:
         client.post("/auth/signup", json={
             "username": "badpinhost",
             "email": "badpinhost@example.com",
-            "password": "pass"
+            "password": "password123"
         })
         create_response = client.post("/sessions/", json={
             "title": "Bad PIN Session",
@@ -113,7 +113,7 @@ class TestSessionIntegration:
         client.post("/auth/signup", json={
             "username": "codehost",
             "email": "codehost@example.com",
-            "password": "pass"
+            "password": "password123"
         })
         create_response = client.post("/sessions/", json={
             "title": "Code Update Session",
@@ -123,7 +123,10 @@ class TestSessionIntegration:
         
         # Update code
         new_code = "def hello():\n    return 'world'"
-        response = client.put(f"/sessions/{session_id}/code", json={"code": new_code})
+        response = client.put(
+            f"/sessions/{session_id}/code",
+            json={"code": new_code, "baseRevision": create_response.json()["codeRevision"]},
+        )
         
         assert response.status_code == 200
         
@@ -137,7 +140,7 @@ class TestSessionIntegration:
         client.post("/auth/signup", json={
             "username": "langhost",
             "email": "langhost@example.com",
-            "password": "pass"
+            "password": "password123"
         })
         create_response = client.post("/sessions/", json={
             "title": "Language Update Session",
@@ -146,7 +149,13 @@ class TestSessionIntegration:
         session_id = create_response.json()["id"]
         
         # Update to JavaScript
-        response = client.put(f"/sessions/{session_id}/language", json={"language": "javascript"})
+        response = client.put(
+            f"/sessions/{session_id}/language",
+            json={
+                "language": "javascript",
+                "baseRevision": create_response.json()["codeRevision"],
+            },
+        )
         
         assert response.status_code == 200
         
@@ -160,7 +169,7 @@ class TestSessionIntegration:
         client.post("/auth/signup", json={
             "username": "endhost",
             "email": "endhost@example.com",
-            "password": "pass"
+            "password": "password123"
         })
         create_response = client.post("/sessions/", json={
             "title": "End Test Session",
@@ -183,7 +192,7 @@ class TestSessionIntegration:
         client.post("/auth/signup", json={
             "username": "chathost",
             "email": "chathost@example.com",
-            "password": "pass"
+            "password": "password123"
         })
         create_response = client.post("/sessions/", json={
             "title": "Chat Test Session",
@@ -215,7 +224,7 @@ class TestSessionIntegration:
         client.post("/auth/signup", json={
             "username": "allhost",
             "email": "allhost@example.com",
-            "password": "pass"
+            "password": "password123"
         })
         
         # Create multiple sessions
@@ -235,7 +244,7 @@ class TestSessionIntegration:
         host_response = client.post("/auth/signup", json={
             "username": "workflowhost",
             "email": "workflowhost@example.com",
-            "password": "pass"
+            "password": "password123"
         })
         assert host_response.status_code == 201
         
@@ -252,7 +261,7 @@ class TestSessionIntegration:
         client.post("/auth/signup", json={
             "username": "workflowparticipant",
             "email": "workflowp@example.com",
-            "password": "pass"
+            "password": "password123"
         })
         join_response = client.post(
             f"/sessions/{session_id}/join",
@@ -263,7 +272,7 @@ class TestSessionIntegration:
         # Update code
         code_response = client.put(
             f"/sessions/{session_id}/code",
-            json={"code": "print('hello')"}
+            json={"code": "print('hello')", "baseRevision": session["codeRevision"]}
         )
         assert code_response.status_code == 200
         
@@ -276,7 +285,7 @@ class TestSessionIntegration:
         
         # End session
         # Re-login as host to end session
-        client.post("/auth/login", json={"email": "workflowhost@example.com", "password": "pass"})
+        client.post("/auth/login", json={"email": "workflowhost@example.com", "password": "password123"})
         
         end_response = client.post(f"/sessions/{session_id}/end")
         assert end_response.status_code == 200

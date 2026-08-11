@@ -51,6 +51,13 @@ def client(test_engine, TestingSessionLocal, setup_database):
     """Create a test client with database session for each test function."""
     from app.database.config import get_db
     from app.main import app
+    from app.utils.rate_limit import limiter
+
+    # The limiter is process-global, while integration tests are isolated cases.
+    # Reset request history so one test cannot consume another test's quota.
+    with limiter._lock:
+        limiter._windows.clear()
+        limiter._checks = 0
     
     def override_get_db():
         db = TestingSessionLocal()
