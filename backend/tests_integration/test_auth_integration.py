@@ -40,8 +40,8 @@ class TestAuthIntegration:
             "password": "differentpassword"
         }
         response = client.post("/auth/signup", json=duplicate_data)
-        assert response.status_code == 400
-        assert "already registered" in response.json()["detail"].lower()
+        assert response.status_code == 409
+        assert response.json()["detail"] == "Unable to create account"
 
     def test_login_with_valid_credentials(self, client: TestClient):
         """Test that login works with valid credentials."""
@@ -98,15 +98,35 @@ class TestAuthIntegration:
         assert response.status_code == 401
         assert response.json()["detail"] == "Invalid email or password"
 
-    def test_guest_login(self, client: TestClient):
-        """Test that guest login creates a user without email."""
-        guest_data = {"username": "GuestPlayer"}
-        response = client.post("/auth/guest", json=guest_data)
-        
-        assert response.status_code == 201
-        guest = response.json()
+    def test_guest_join_creates_authenticated_user(self, client: TestClient):
+        """Test that validated session admission creates an authenticated guest."""
+        signup_response = client.post("/auth/signup", json={
+            "username": "guesthost",
+            "email": "guesthost@example.com",
+            "password": "password123",
+        })
+        assert signup_response.status_code == 201
+        session_response = client.post("/sessions/", json={
+            "title": "Guest Admission Session",
+            "language": "python",
+        })
+        assert session_response.status_code == 201
+        session = session_response.json()
+        assert client.post("/auth/logout").status_code == 200
+
+        response = client.post(f"/sessions/{session['id']}/guest-join", json={
+            "username": "GuestPlayer",
+            "pin": session["pin"],
+            "attemptId": "guest_attempt_123456",
+            "attemptSecret": "guest_secret_1234567890123456789012",
+        })
+
+        assert response.status_code == 200
+        guest = response.json()["user"]
         assert guest["username"] == "GuestPlayer"
         assert guest["email"] is None
+        assert response.json()["session"]["id"] == session["id"]
+        assert client.get("/auth/me").json()["id"] == guest["id"]
 
     def test_logout(self, client: TestClient):
         """Test that logout endpoint returns success."""
