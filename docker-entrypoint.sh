@@ -8,5 +8,5 @@ esac
 
 # Render supplies PORT at runtime. Keep nginx and the backend private to the
 # container and let nginx expose the single public listener.
-sed "s/__PORT__/${port}/g" /etc/nginx/conf.d/default.template.conf > /etc/nginx/conf.d/default.conf
+sed "s/__PORT__/${port}/g" /etc/nginx/default.conf.template > /etc/nginx/conf.d/default.conf
 exec /usr/bin/supervisord -c /etc/supervisor/conf.d/supervisord.conf

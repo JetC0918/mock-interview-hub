@@ -54,8 +54,9 @@ COPY backend/alembic.ini /app/backend/alembic.ini
 COPY --from=frontend-builder /app/dist /usr/share/nginx/html
 COPY --from=frontend-builder /app/node_modules/monaco-editor/min/vs /usr/share/nginx/html/monaco/vs
 
-# Copy nginx configuration
-COPY nginx.combined.conf /etc/nginx/conf.d/default.template.conf
+# Keep the runtime template outside conf.d so nginx cannot parse it before the
+# entrypoint replaces Render's PORT placeholder.
+COPY nginx.combined.conf /etc/nginx/default.conf.template
 
 # Remove default nginx site configuration
 RUN rm -f /etc/nginx/sites-enabled/default
